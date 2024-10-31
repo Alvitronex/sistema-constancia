@@ -1,1 +1,1 @@
-init
+ejecutar en terminal npm install antes de utilizar ionic serve
