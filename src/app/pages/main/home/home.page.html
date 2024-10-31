@@ -1,0 +1,146 @@
+<app-header [showMenu]="true" title="Inicio"></app-header>
+
+<ion-content>
+  <ion-refresher slot="fixed" (ionRefresh)="doRefresh($event)">
+    <ion-refresher-content></ion-refresher-content>
+  </ion-refresher>
+
+  <ion-card
+    mode="ios"
+    color="secondary"
+    class="d-flex-center ion-text-center"
+    *ngIf="!loading && products.length"
+    style="box-shadow: 100px"
+  >
+    <div>
+      <h5>{{products.length}}</h5>
+      <p>Productos</p>
+    </div>
+    <div>
+      <h5>{{ getProfits() | currency: 'USD'}}</h5>
+      <p>Ganacias</p>
+    </div>
+  </ion-card>
+
+  <!-- === Main Button PDF === -->
+  <ion-button
+    color="warning"
+    shape="round"
+    (click)="generatePDF()"
+    mode="ios"
+    *ngIf="!loading && products.length"
+  >
+    <ion-icon slot="start" name="download-outline"></ion-icon>
+    <ion-label>PDF</ion-label>
+  </ion-button>
+
+  <!-- ======= Productos ======= -->
+  <ion-list *ngIf="!loading && displayedProducts.length>0">
+    <ion-item-sliding class="product-item" *ngFor="let p of displayedProducts">
+      <ion-item>
+        <ion-avatar slot="start">
+          <img [src]="p.image" />
+        </ion-avatar>
+        <ion-label>
+          <div class="name">{{p.name}}</div>
+          <div class="data">
+            <strong>Precio</strong> {{p.price | currency: 'USD'}} <br />
+            <strong>Unidades Vendidas:</strong> {{p.soldUnits}}
+          </div>
+
+          <ion-chip color="primary" mode="ios" outline="true">
+            <ion-label
+              >Ganancia: {{p.price * p.soldUnits | currency: 'USD'}}
+            </ion-label>
+          </ion-chip>
+        </ion-label>
+      </ion-item>
+
+      <!-- ======= Opciones ======= -->
+      <ion-item-options>
+        <!-- ==== Editar ==== -->
+        <ion-item-option (click)="addUpdateProduct(p)">
+          <ion-icon class="option-btn" name="create-outline"></ion-icon>
+        </ion-item-option>
+
+        <!-- ==== Eliminar ==== -->
+        <ion-item-option (click)="confirmDeleteProduct(p)" color="danger">
+          <ion-icon class="option-btn" name="trash-outline"></ion-icon>
+        </ion-item-option>
+        <!-- ==== Generar PDF ==== -->
+        <ion-item-option (click)="generatePDF(p)" color="warning">
+          <ion-icon class="option-btn" name="document-text-outline"></ion-icon>
+        </ion-item-option>
+      </ion-item-options>
+    </ion-item-sliding>
+  </ion-list>
+
+  <!-- ======= Paginador ======= -->
+  <ion-grid *ngIf="!loading && products.length > 0">
+    <ion-row class="ion-justify-content-center">
+      <ion-col size="auto">
+        <ion-button
+          fill="clear"
+          (click)="prevPage()"
+          [disabled]="currentPage === 1"
+        >
+          <ion-icon name="chevron-back-outline"></ion-icon>
+        </ion-button>
+      </ion-col>
+      <ion-col size="auto" *ngFor="let page of pages">
+        <ion-button
+          fill="clear"
+          [color]="page === currentPage ? 'primary' : 'medium'"
+          (click)="goToPage(page)"
+        >
+          {{ page }}
+        </ion-button>
+      </ion-col>
+      <ion-col size="auto">
+        <ion-button
+          fill="clear"
+          (click)="nextPage()"
+          [disabled]="currentPage === totalPages"
+        >
+          <ion-icon name="chevron-forward-outline"></ion-icon>
+        </ion-button>
+      </ion-col>
+    </ion-row>
+  </ion-grid>
+
+  <!-- ======= Loading =======-->
+  <ion-list *ngIf="loading">
+    <ion-item class="product-item" *ngFor="let p of [1,1,1,1,1,1,1,1]">
+      <ion-avatar slot="start">
+        <ion-skeleton-text
+          animated
+          style="width: 100%; height: 100%"
+        ></ion-skeleton-text>
+      </ion-avatar>
+      <ion-label>
+        <div>
+          <ion-skeleton-text animated style="width: 50%"></ion-skeleton-text>
+        </div>
+        <div>
+          <ion-skeleton-text animated style="width: 30%"></ion-skeleton-text>
+        </div>
+      </ion-label>
+    </ion-item>
+  </ion-list>
+
+  <!-- ======= Sin Productos disponibles======= -->
+  <div *ngIf="!loading && !products.length" class="empty">
+    <ion-icon name="shield-outline"></ion-icon>
+    <h3>No hay productos disponibles</h3>
+  </div>
+
+  <!-- ======= NUevo Producto ======= -->
+  <ion-fab vertical="bottom" horizontal="end" slot="fixed" style="right: 25px">
+    <ion-fab-button (click)="addUpdateProduct()">
+      <ion-icon name="add"></ion-icon>
+    </ion-fab-button>
+  </ion-fab>
+  <!-- <ion-infinite-scroll (ionInfinite)="loadMoreData($event)">
+    <ion-infinite-scroll-content></ion-infinite-scroll-content>
+  </ion-infinite-scroll> -->
+</ion-content>

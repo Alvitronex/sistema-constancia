@@ -1,0 +1,91 @@
+<app-header
+  [isModal]="true"
+  [title]="user ? 'Actualizar Usuario' : 'Agregar Usuario'"
+></app-header>
+<ion-content>
+  <form
+    [formGroup]="form"
+    class="ion-padding ion-text-center"
+    (ngSubmit)="submit()"
+    (keypress.enter)="submit()"
+  >
+    <!-- Image upload -->
+    <div class="image-upload">
+      <img [src]="imagePreview || 'assets/default-avatar.png'" alt="User profile" class="profile-image">
+      <input type="file" (change)="onImageSelected($event)" accept="image/*" #fileInput style="display: none;">
+      <ion-button (click)="fileInput.click()" fill="clear">
+        <ion-icon name="camera-outline" slot="icon-only"></ion-icon>
+      </ion-button>
+    </div>
+
+    <!--============ Name ======== -->
+    <app-custom-input
+      autocomplete="name"
+      [control]="form.controls.name"
+      type="text"
+      label="Nombre"
+    ></app-custom-input>
+
+    <div
+      class="validators"
+      *ngIf="form.controls.name.errors && form.controls.name.touched"
+    >
+      <div *ngIf="form.controls.name.errors?.['required']">
+        El nombre es requerido
+      </div>
+      <div *ngIf="form.controls.name.errors?.['minlength']">
+        El nombre debe tener al menos 4 caracteres
+      </div>
+    </div>
+
+    <!--============ Email ======== -->
+    <app-custom-input
+      autocomplete="email"
+      [control]="form.controls.email"
+      type="email"
+      label="Correo electrónico"
+    ></app-custom-input>
+
+    <div
+      class="validators"
+      *ngIf="form.controls.email.errors && form.controls.email.touched"
+    >
+      <div *ngIf="form.controls.email.errors?.['required']">
+        El correo electrónico es requerido
+      </div>
+      <div *ngIf="form.controls.email.errors?.['email']">
+        El correo electrónico no es válido
+      </div>
+    </div>
+
+    <!--============ Password ======== -->
+    <app-custom-input
+      *ngIf="!user"
+      [control]="form.controls.password"
+      type="password"
+      label="Contraseña"
+    ></app-custom-input>
+
+    <div
+      class="validators"
+      *ngIf="form.controls.password.errors && form.controls.password.touched"
+    >
+      <div *ngIf="form.controls.password.errors?.['required']">
+        La contraseña es requerida
+      </div>
+      <div *ngIf="form.controls.password.errors?.['minlength']">
+        La contraseña debe tener al menos 6 caracteres
+      </div>
+    </div>
+
+    <ion-button
+      mode="ios"
+      class="ion-margin"
+      type="submit"
+      [disabled]="form.invalid"
+    >
+      {{ user ? "Actualizar Usuario" : "Agregar Usuario" }}
+      <ion-icon slot="end" name="checkmark-circle-outline"></ion-icon>
+    </ion-button>
+  </form>
+</ion-content>
