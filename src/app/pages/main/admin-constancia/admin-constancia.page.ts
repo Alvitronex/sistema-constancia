@@ -1,41 +1,13 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { FormControl } from '@angular/forms';
 import { Observable, Subject } from 'rxjs';
-import { takeUntil, debounceTime, distinctUntilChanged } from 'rxjs/operators';
+import { takeUntil, debounceTime, distinctUntilChanged, tap } from 'rxjs/operators';
 import { FirebaseService } from 'src/app/services/firebase.service';
 import { UtilsService } from 'src/app/services/utils.service';
 import { Constancia } from 'src/app/models/constancia.model';
 import { orderBy } from '@angular/fire/firestore';
-// Agregar esto antes de la clase del componente
-declare var pdfMake: any;
+import * as pdfMake from 'pdfmake/build/pdfmake';
 
-interface PdfDocumentDefinition {
-  pageSize: string;
-  pageMargins: number[];
-  content: Array<{
-    text?: string;
-    style?: string;
-    alignment?: string;
-    columns?: Array<{
-      text: string;
-      style?: string;
-      alignment?: string;
-    }>;
-  }>;
-  styles: {
-    [key: string]: {
-      fontSize?: number;
-      bold?: boolean;
-      alignment?: string;
-      italic?: boolean;
-      margin?: number[];
-      color?: string;
-    };
-  };
-  defaultStyle: {
-    font: string;
-  };
-}
 @Component({
   selector: 'app-admin-constancia',
   templateUrl: './admin-constancia.page.html',
@@ -43,6 +15,8 @@ interface PdfDocumentDefinition {
 })
 export class AdminConstanciaPage implements OnInit, OnDestroy {
   constancias$: Observable<Constancia[]>;
+  loading = true;
+  error = false;
   searchControl = new FormControl('');
   tipoControl = new FormControl('todos');
   estadoControl = new FormControl('todos');
@@ -79,11 +53,40 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
   }
 
   private loadConstancias() {
-    // Usamos el método getCollectionData como está definido originalmente
-    this.constancias$ = this.firebaseSvc.getCollectionData(
-      'constancias',
-      [orderBy('createdAt', 'desc')]
-    ) as Observable<Constancia[]>;
+    try {
+      this.loading = true;
+      this.error = false;
+
+      const constanciasRef = this.firebaseSvc.getCollectionData(
+        'constancias',
+        [orderBy('createdAt', 'desc')]
+      ) as Observable<Constancia[]>;
+
+      this.constancias$ = constanciasRef.pipe(
+        tap({
+          next: (data) => {
+            console.log('Constancias loaded:', data);
+            this.loading = false;
+          },
+          error: (error) => {
+            console.error('Error loading constancias:', error);
+            this.error = true;
+            this.loading = false;
+            this.utilsSvc.presentToast({
+              message: 'Error al cargar constancias',
+              duration: 2500,
+              color: 'danger',
+              position: 'bottom'
+            });
+          }
+        }),
+        takeUntil(this.destroy$)
+      );
+    } catch (error) {
+      console.error('Error in loadConstancias:', error);
+      this.error = true;
+      this.loading = false;
+    }
   }
 
   private setupSearchListener() {
@@ -91,32 +94,42 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
       debounceTime(300),
       distinctUntilChanged(),
       takeUntil(this.destroy$)
-    ).subscribe(() => {
+    ).subscribe(searchTerm => {
+      console.log('Search term:', searchTerm);
+      // Aquí puedes implementar la lógica de búsqueda
       this.loadConstancias();
     });
   }
 
   private setupFilterListeners() {
+    // Escuchar cambios en el filtro de tipo
     this.tipoControl.valueChanges.pipe(
       takeUntil(this.destroy$)
-    ).subscribe(() => {
+    ).subscribe(tipo => {
+      console.log('Tipo selected:', tipo);
       this.loadConstancias();
     });
 
+    // Escuchar cambios en el filtro de estado
     this.estadoControl.valueChanges.pipe(
       takeUntil(this.destroy$)
-    ).subscribe(() => {
+    ).subscribe(estado => {
+      console.log('Estado selected:', estado);
       this.loadConstancias();
     });
+  }
+
+  // Función para obtener el color del estado
+  getStatusColor(estado: string): string {
+    const estadoFound = this.estadosConstancia.find(e => e.value === estado);
+    return estadoFound ? estadoFound.color : 'medium';
   }
 
   // Función de seguimiento para ngFor
   trackByFn(index: number, constancia: Constancia): string {
     return constancia.id;
-  }
-
-  async onUpdateStatus(constancia: Constancia, newStatus: string) {
-    const confirmAlert = await this.utilsSvc.presentAlert({
+  } async onUpdateStatus(constancia: Constancia, newStatus: string) {
+    const alert = await this.utilsSvc.presentAlert({
       header: 'Confirmar cambio',
       message: `¿Está seguro de cambiar el estado a "${newStatus}"?`,
       buttons: [
@@ -130,16 +143,14 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
             const loading = await this.utilsSvc.loading();
             try {
               await loading.present();
-
               await this.firebaseSvc.updateConstanciaStatus(constancia.id, newStatus);
-
+              
               this.utilsSvc.presentToast({
                 message: 'Estado actualizado correctamente',
                 color: 'success',
                 duration: 2500,
                 position: 'middle'
               });
-
             } catch (error) {
               console.error('Error al actualizar estado:', error);
               this.utilsSvc.presentToast({
@@ -184,93 +195,40 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
     }
 
     const loading = await this.utilsSvc.loading();
-
     try {
       await loading.present();
 
-      // Aquí es donde aplicamos la interfaz
-      const docDefinition: PdfDocumentDefinition = {
-        pageSize: 'A4',
-        pageMargins: [40, 60, 40, 60],
+      const docDefinition:any = {
         content: [
-          {
-            text: 'CONSTANCIA',
-            style: 'header'
-          },
-          {
-            text: '\n\n'
-          },
-          {
-            text: 'Por medio de la presente se certifica que:',
-            style: 'subheader'
-          },
-          {
-            text: '\n'
-          },
-          {
-            text: `${constancia.nombre} ${constancia.apellidos}`,
-            style: 'nombre'
-          },
-          {
-            text: '\n\n'
-          },
-          {
-            text: `Con documento de identidad: ${constancia.documento}`,
-            style: 'documento'
-          },
-          {
-            text: '\n\n'
-          },
-          {
-            text: `Solicita constancia de ${constancia.tipo.toLowerCase()} por motivo de:`,
-            style: 'motivo'
-          },
-          {
-            text: constancia.motivo,
-            style: 'motivoTexto'
-          },
-          {
-            text: '\n\n\n'
-          },
-          {
-            columns: [
-              {
-                text: `Fecha de emisión: ${new Date().toLocaleDateString()}`,
-                style: 'fecha'
-              },
-              {
-                text: `Folio: ${constancia.id}`,
-                style: 'folio'
-              }
+          { text: 'CONSTANCIA', style: 'header' },
+          { 
+            text: [
+              { text: '\nTipo de Constancia: ', bold: true },
+              constancia.tipo
             ]
           },
           {
-            text: '\n\n\n\n'
-          },
-          {
-            columns: [
-              {
-                text: '______________________',
-                alignment: 'center'
-              },
-              {
-                text: '______________________',
-                alignment: 'center'
-              }
+            text: [
+              { text: '\nNombre Completo: ', bold: true },
+              `${constancia.nombre} ${constancia.apellidos}`
             ]
           },
           {
-            columns: [
-              {
-                text: 'Firma del Solicitante',
-                alignment: 'center',
-                style: 'firma'
-              },
-              {
-                text: 'Sello y Firma',
-                alignment: 'center',
-                style: 'firma'
-              }
+            text: [
+              { text: '\nDocumento: ', bold: true },
+              constancia.documento
+            ]
+          },
+          {
+            text: [
+              { text: '\nMotivo: ', bold: true },
+              constancia.motivo
+            ]
+          },
+          {
+            text: [
+              { text: '\nFecha de Emisión: ', bold: true },
+              new Date().toLocaleDateString()
             ]
           }
         ],
@@ -278,52 +236,14 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
           header: {
             fontSize: 22,
             bold: true,
-            alignment: 'center'
-          },
-          subheader: {
-            fontSize: 16,
-            alignment: 'center'
-          },
-          nombre: {
-            fontSize: 14,
-            bold: true,
-            alignment: 'center'
-          },
-          documento: {
-            fontSize: 12,
-            alignment: 'center'
-          },
-          motivo: {
-            fontSize: 12
-          },
-          motivoTexto: {
-            fontSize: 12,
-            italic: true,
-            alignment: 'justify'
-          },
-          fecha: {
-            fontSize: 10
-          },
-          folio: {
-            fontSize: 10,
-            color: 'grey'
-          },
-          firma: {
-            fontSize: 10,
-            margin: [0, 5, 0, 0]
+            alignment: 'center',
+            margin: [0, 0, 0, 20]
           }
-        },
-        defaultStyle: {
-          font: 'Helvetica'
         }
       };
 
-      // Configurar pdfMake
       this.utilsSvc.pdfMake();
-
-      // Generar y descargar el PDF
-      const pdfDocGenerator = pdfMake.createPdf(docDefinition);
-      pdfDocGenerator.download(`constancia_${constancia.tipo.toLowerCase()}_${constancia.id}.pdf`);
+      pdfMake.createPdf(docDefinition).download(`constancia-${constancia.tipo}-${constancia.documento}.pdf`);
 
       this.utilsSvc.presentToast({
         message: 'PDF generado correctamente',
@@ -342,10 +262,5 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
     } finally {
       loading.dismiss();
     }
-  }
-
-  getStatusColor(estado: string): string {
-    const estadoFound = this.estadosConstancia.find(e => e.value === estado);
-    return estadoFound ? estadoFound.color : 'medium';
   }
 }

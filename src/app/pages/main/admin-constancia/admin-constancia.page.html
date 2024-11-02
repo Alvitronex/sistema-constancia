@@ -1,6 +1,5 @@
 <app-header [showMenu]="true" title="Administracion Constancias"></app-header>
 
-
 <ion-content>
   <div class="ion-padding">
     <!-- Filtros y búsqueda -->
@@ -47,6 +46,7 @@
     <!-- Lista de constancias -->
     <ion-list>
       <ion-item-sliding *ngFor="let constancia of constancias$ | async">
+        <!-- Item principal -->
         <ion-item class="constancia-item">
           <ion-grid>
             <ion-row class="ion-align-items-center">
@@ -73,7 +73,9 @@
           </ion-grid>
         </ion-item>
 
+        <!-- Opciones deslizables -->
         <ion-item-options side="end">
+          <!-- Aprobar constancia -->
           <ion-item-option
             *ngIf="constancia.estado === 'pendiente'"
             color="success"
@@ -82,6 +84,7 @@
             <ion-icon slot="icon-only" name="checkmark"></ion-icon>
           </ion-item-option>
 
+          <!-- Rechazar constancia -->
           <ion-item-option
             *ngIf="constancia.estado === 'pendiente'"
             color="danger"
@@ -90,10 +93,12 @@
             <ion-icon slot="icon-only" name="close"></ion-icon>
           </ion-item-option>
 
+          <!-- Ver detalles -->
           <ion-item-option color="primary" (click)="onViewDetails(constancia)">
             <ion-icon slot="icon-only" name="eye"></ion-icon>
           </ion-item-option>
 
+          <!-- Generar PDF -->
           <ion-item-option
             *ngIf="constancia.estado === 'aprobada'"
             color="tertiary"

@@ -1,84 +1,45 @@
-// admin-constancias.page.scss
-ion-content {
-    --background: #f5f5f5;
+.empty-state {
+  text-align: center;
+  padding: 2rem;
+
+  .large-icon {
+    font-size: 4rem;
+    color: var(--ion-color-medium);
   }
-  
-  .constancia-item {
-    margin: 8px 0;
-    border-radius: 8px;
-    --background: white;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  
-    h2 {
-      margin: 0;
-      font-size: 16px;
-      font-weight: 500;
-      color: var(--ion-color-dark);
-    }
-  
-    p {
-      margin: 4px 0;
-      font-size: 14px;
-      color: var(--ion-color-medium);
-    }
-  
-    ion-chip {
-      margin: 0;
-    }
-  
-    ion-badge {
-      padding: 8px 12px;
-    }
+
+  h3 {
+    margin-top: 1rem;
+    color: var(--ion-color-dark);
   }
-  
-  .empty-state {
-    text-align: center;
-    padding: 40px 20px;
-    
-    .large-icon {
-      font-size: 64px;
-      color: var(--ion-color-medium);
-    }
-  
-    h3 {
-      margin: 16px 0 8px;
-      font-size: 20px;
-      font-weight: 500;
-      color: var(--ion-color-dark);
-    }
-  
-    p {
-      margin: 0;
-      color: var(--ion-color-medium);
-      font-size: 14px;
-    }
+
+  p {
+    color: var(--ion-color-medium);
   }
-  
-  // Responsive adjustments
-  @media (max-width: 768px) {
-    .constancia-item {
-      ion-grid {
-        padding: 8px 0;
-      }
-      
-      ion-col {
-        padding: 4px 0;
-      }
-    }
+}
+
+.constancia-item {
+  h2 {
+    font-weight: 500;
+    margin-bottom: 0.25rem;
   }
-  
-  // Animations
-  @keyframes fadeIn {
-    from {
-      opacity: 0;
-      transform: translateY(20px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
+
+  p {
+    margin: 0;
+    color: var(--ion-color-medium);
   }
-  
-  .constancia-item {
-    animation: fadeIn 0.3s ease-out;
+
+  ion-badge {
+    padding: 0.5rem 0.75rem;
   }
+}
+
+ion-searchbar {
+  --background: var(--ion-color-light);
+  --border-radius: 8px;
+}
+
+ion-item-options {
+  ion-item-option {
+    padding: 0 1rem;
+  }
+}
