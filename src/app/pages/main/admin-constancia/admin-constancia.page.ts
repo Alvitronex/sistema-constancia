@@ -1,12 +1,13 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { FormControl } from '@angular/forms';
-import { Observable, Subject } from 'rxjs';
-import { takeUntil, debounceTime, distinctUntilChanged, tap } from 'rxjs/operators';
+import { Observable, Subject, combineLatest } from 'rxjs';
+import { takeUntil, debounceTime, distinctUntilChanged, map, startWith } from 'rxjs/operators';
 import { FirebaseService } from 'src/app/services/firebase.service';
 import { UtilsService } from 'src/app/services/utils.service';
 import { Constancia } from 'src/app/models/constancia.model';
 import { orderBy } from '@angular/fire/firestore';
-import * as pdfMake from 'pdfmake/build/pdfmake';
+
+declare var pdfMake: any;
 
 @Component({
   selector: 'app-admin-constancia',
@@ -15,12 +16,14 @@ import * as pdfMake from 'pdfmake/build/pdfmake';
 })
 export class AdminConstanciaPage implements OnInit, OnDestroy {
   constancias$: Observable<Constancia[]>;
+  filteredConstancias$: Observable<Constancia[]>;
   loading = true;
   error = false;
   searchControl = new FormControl('');
   tipoControl = new FormControl('todos');
   estadoControl = new FormControl('todos');
   private destroy$ = new Subject<void>();
+  private allConstancias: Constancia[] = [];
 
   // Tipos de constancias disponibles
   tiposConstancia = [
@@ -42,9 +45,10 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
   ) { }
 
   ngOnInit() {
+    this.searchControl = new FormControl('');
+    this.tipoControl = new FormControl('todos');
+    this.estadoControl = new FormControl('todos');
     this.loadConstancias();
-    this.setupSearchListener();
-    this.setupFilterListeners();
   }
 
   ngOnDestroy() {
@@ -62,26 +66,39 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
         [orderBy('createdAt', 'desc')]
       ) as Observable<Constancia[]>;
 
-      this.constancias$ = constanciasRef.pipe(
-        tap({
-          next: (data) => {
-            console.log('Constancias loaded:', data);
-            this.loading = false;
-          },
-          error: (error) => {
-            console.error('Error loading constancias:', error);
-            this.error = true;
-            this.loading = false;
-            this.utilsSvc.presentToast({
-              message: 'Error al cargar constancias',
-              duration: 2500,
-              color: 'danger',
-              position: 'bottom'
-            });
-          }
+      // Log para verificar la carga inicial
+      console.log('Iniciando carga de constancias');
+
+      this.searchControl.valueChanges.subscribe(value => {
+        console.log('Término de búsqueda:', value);
+      });
+
+      this.filteredConstancias$ = combineLatest([
+        constanciasRef,
+        this.searchControl.valueChanges.pipe(
+          startWith(''),
+          debounceTime(300),
+          distinctUntilChanged()
+        ),
+        this.tipoControl.valueChanges.pipe(startWith('todos')),
+        this.estadoControl.valueChanges.pipe(startWith('todos'))
+      ]).pipe(
+        map(([constancias, searchTerm, tipo, estado]) => {
+          this.allConstancias = constancias;
+          this.loading = false;
+
+          console.log('Datos a filtrar:', {
+            totalConstancias: constancias.length,
+            searchTerm,
+            tipo,
+            estado
+          });
+
+          return this.filterConstancias(constancias, searchTerm, tipo, estado);
         }),
         takeUntil(this.destroy$)
       );
+
     } catch (error) {
       console.error('Error in loadConstancias:', error);
       this.error = true;
@@ -89,46 +106,51 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
     }
   }
 
-  private setupSearchListener() {
-    this.searchControl.valueChanges.pipe(
-      debounceTime(300),
-      distinctUntilChanged(),
-      takeUntil(this.destroy$)
-    ).subscribe(searchTerm => {
-      console.log('Search term:', searchTerm);
-      // Aquí puedes implementar la lógica de búsqueda
-      this.loadConstancias();
+  private filterConstancias(
+    constancias: Constancia[],
+    searchTerm: string,
+    tipo: string,
+    estado: string
+  ): Constancia[] {
+    searchTerm = searchTerm || '';
+    
+    return constancias.filter(constancia => {
+      const searchString = [
+        constancia.nombre,
+        constancia.apellidos,
+        constancia.documento
+      ].join(' ').toLowerCase();
+
+      const termToSearch = searchTerm.toLowerCase().trim();
+
+      const matchesSearch = searchString.includes(termToSearch);
+      const matchesTipo = tipo === 'todos' || constancia.tipo === tipo;
+      const matchesEstado = estado === 'todos' || constancia.estado === estado;
+
+      // Log del resultado de la búsqueda
+      console.log('Filtro aplicado:', {
+        constancia: constancia.nombre,
+        searchMatch: matchesSearch,
+        tipoMatch: matchesTipo,
+        estadoMatch: matchesEstado
+      });
+
+      return matchesSearch && matchesTipo && matchesEstado;
     });
   }
 
-  private setupFilterListeners() {
-    // Escuchar cambios en el filtro de tipo
-    this.tipoControl.valueChanges.pipe(
-      takeUntil(this.destroy$)
-    ).subscribe(tipo => {
-      console.log('Tipo selected:', tipo);
-      this.loadConstancias();
-    });
-
-    // Escuchar cambios en el filtro de estado
-    this.estadoControl.valueChanges.pipe(
-      takeUntil(this.destroy$)
-    ).subscribe(estado => {
-      console.log('Estado selected:', estado);
-      this.loadConstancias();
-    });
+  clearFilters() {
+    this.searchControl.setValue('');
+    this.tipoControl.setValue('todos');
+    this.estadoControl.setValue('todos');
   }
 
-  // Función para obtener el color del estado
   getStatusColor(estado: string): string {
     const estadoFound = this.estadosConstancia.find(e => e.value === estado);
     return estadoFound ? estadoFound.color : 'medium';
   }
 
-  // Función de seguimiento para ngFor
-  trackByFn(index: number, constancia: Constancia): string {
-    return constancia.id;
-  } async onUpdateStatus(constancia: Constancia, newStatus: string) {
+  async onUpdateStatus(constancia: Constancia, newStatus: string) {
     const alert = await this.utilsSvc.presentAlert({
       header: 'Confirmar cambio',
       message: `¿Está seguro de cambiar el estado a "${newStatus}"?`,
@@ -198,7 +220,7 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
     try {
       await loading.present();
 
-      const docDefinition:any = {
+      const docDefinition = {
         content: [
           { text: 'CONSTANCIA', style: 'header' },
           { 
@@ -262,5 +284,10 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
     } finally {
       loading.dismiss();
     }
+  }
+
+  async handleRefresh(event?: any) {
+    await this.loadConstancias();
+    event?.target?.complete();
   }
 }

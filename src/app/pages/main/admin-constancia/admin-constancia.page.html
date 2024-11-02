@@ -45,7 +45,7 @@
 
     <!-- Lista de constancias -->
     <ion-list>
-      <ion-item-sliding *ngFor="let constancia of constancias$ | async">
+      <ion-item-sliding *ngFor="let constancia of filteredConstancias$ | async">
         <!-- Item principal -->
         <ion-item class="constancia-item">
           <ion-grid>
@@ -111,10 +111,16 @@
     </ion-list>
 
     <!-- Estado vacío -->
-    <div class="empty-state" *ngIf="(constancias$ | async)?.length === 0">
+    <div class="empty-state" *ngIf="(filteredConstancias$ | async)?.length === 0">
       <ion-icon name="documents-outline" class="large-icon"></ion-icon>
       <h3>No hay constancias</h3>
-      <p>No se encontraron constancias registradas</p>
+      <p>No se encontraron constancias con los filtros actuales</p>
+      
+      <!-- Botón para limpiar filtros -->
+      <ion-button fill="clear" (click)="clearFilters()">
+        <ion-icon slot="start" name="refresh"></ion-icon>
+        Limpiar filtros
+      </ion-button>
     </div>
   </div>
 </ion-content>

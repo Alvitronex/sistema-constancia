@@ -43,3 +43,24 @@ ion-item-options {
     padding: 0 1rem;
   }
 }
+ion-searchbar {
+  --background: var(--ion-color-light);
+  --border-radius: 8px;
+  margin-bottom: 1rem;
+
+  &.focused {
+    --background: var(--ion-color-light-shade);
+  }
+}
+
+.filter-badge {
+  margin-right: 0.5rem;
+  --padding-start: 8px;
+  --padding-end: 8px;
+}
+
+.empty-state {
+  ion-button {
+    margin-top: 1rem;
+  }
+}
