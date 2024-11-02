@@ -42,7 +42,19 @@
         </ion-col>
       </ion-row>
     </ion-grid>
-
+    <!-- Agregar esto después de los filtros -->
+    <ion-row>
+      <ion-col>
+        <ion-button
+          expand="block"
+          (click)="generateMonthlyReport()"
+          color="tertiary"
+        >
+          <ion-icon name="document-text-outline" slot="start"></ion-icon>
+          Generar Informe Mensual
+        </ion-button>
+      </ion-col>
+    </ion-row>
     <!-- Lista de constancias -->
     <ion-list>
       <ion-item-sliding *ngFor="let constancia of filteredConstancias$ | async">
@@ -111,11 +123,14 @@
     </ion-list>
 
     <!-- Estado vacío -->
-    <div class="empty-state" *ngIf="(filteredConstancias$ | async)?.length === 0">
+    <div
+      class="empty-state"
+      *ngIf="(filteredConstancias$ | async)?.length === 0"
+    >
       <ion-icon name="documents-outline" class="large-icon"></ion-icon>
       <h3>No hay constancias</h3>
       <p>No se encontraron constancias con los filtros actuales</p>
-      
+
       <!-- Botón para limpiar filtros -->
       <ion-button fill="clear" (click)="clearFilters()">
         <ion-icon slot="start" name="refresh"></ion-icon>

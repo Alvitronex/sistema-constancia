@@ -1,163 +1,86 @@
-<app-header [showMenu]="true" title="Constancias"></app-header>
+<!-- registrar-constancia.page.html -->
+<app-header [showMenu]="true" title="Registrar Constancia"></app-header>
 
 <ion-content>
-  <!-- Segmento para cambiar entre vistas -->
-  <ion-segment [(ngModel)]="selectedSegment" mode="ios" class="ion-padding">
-    <ion-segment-button value="generar">
-      <ion-label>Generar</ion-label>
-    </ion-segment-button>
-    <ion-segment-button value="historial">
-      <ion-label>Historial</ion-label>
-    </ion-segment-button>
-  </ion-segment>
+  <div class="ion-padding">
+    <form [formGroup]="form" (ngSubmit)="onSubmit()">
+      <ion-card>
+        <ion-card-header>
+          <ion-card-title>Nueva Constancia</ion-card-title>
+          <ion-card-subtitle>Complete todos los campos</ion-card-subtitle>
+        </ion-card-header>
 
-  <!-- Sección de Generar Constancia -->
-  <div *ngIf="selectedSegment === 'generar'" class="ion-padding content">
-    <form [formGroup]="form" (ngSubmit)="submit()" class="form-container">
-      <ion-list>
-        <!-- Nombre -->
-        <ion-item class="ion-margin-vertical">
-          <ion-label position="floating">Nombres</ion-label>
-          <ion-input formControlName="nombre" type="text"></ion-input>
-          <ion-note slot="error" *ngIf="hasError('nombre', 'required')">
-            El nombre es requerido
-          </ion-note>
-          <ion-note slot="error" *ngIf="hasError('nombre', 'minlength')">
-            El nombre debe tener al menos 2 caracteres
-          </ion-note>
-        </ion-item>
+        <ion-card-content>
+          <ion-item>
+            <ion-label position="floating">Nombres</ion-label>
+            <ion-input formControlName="nombre" type="text"></ion-input>
+            <ion-note slot="error" *ngIf="form.get('nombre').touched">
+              {{ getErrorMessage('nombre') }}
+            </ion-note>
+          </ion-item>
 
-        <!-- Apellidos -->
-        <ion-item class="ion-margin-vertical">
-          <ion-label position="floating">Apellidos</ion-label>
-          <ion-input formControlName="apellidos" type="text"></ion-input>
-          <ion-note slot="error" *ngIf="hasError('apellidos', 'required')">
-            Los apellidos son requeridos
-          </ion-note>
-          <ion-note slot="error" *ngIf="hasError('apellidos', 'minlength')">
-            Los apellidos deben tener al menos 2 caracteres
-          </ion-note>
-        </ion-item>
+          <ion-item>
+            <ion-label position="floating">Apellidos</ion-label>
+            <ion-input formControlName="apellidos" type="text"></ion-input>
+            <ion-note slot="error" *ngIf="form.get('apellidos').touched">
+              {{ getErrorMessage('apellidos') }}
+            </ion-note>
+          </ion-item>
 
-        <!-- Documento -->
-        <ion-item class="ion-margin-vertical">
-          <ion-label position="floating">Documento de Identidad</ion-label>
-          <ion-input formControlName="documento" type="text"></ion-input>
-          <ion-note slot="error" *ngIf="hasError('documento', 'required')">
-            El documento es requerido
-          </ion-note>
-          <ion-note slot="error" *ngIf="hasError('documento', 'minlength')">
-            El documento debe tener al menos 5 caracteres
-          </ion-note>
-        </ion-item>
+          <ion-item>
+            <ion-label position="floating">Documento</ion-label>
+            <ion-input formControlName="documento" type="text"></ion-input>
+            <ion-note slot="error" *ngIf="form.get('documento').touched">
+              {{ getErrorMessage('documento') }}
+            </ion-note>
+          </ion-item>
 
-        <!-- Tipo de Constancia -->
-        <ion-item class="ion-margin-vertical">
-          <ion-label position="floating">Tipo de Constancia</ion-label>
-          <ion-select formControlName="tipo" interface="action-sheet">
-            <ion-select-option value="LABORAL"
-              >Constancia Laboral</ion-select-option
-            >
-            <ion-select-option value="ESTUDIOS"
-              >Constancia de Estudios</ion-select-option
-            >
-            <ion-select-option value="RESIDENCIA"
-              >Constancia de Residencia</ion-select-option
-            >
-          </ion-select>
-          <ion-note slot="error" *ngIf="hasError('tipo', 'required')">
-            El tipo de constancia es requerido
-          </ion-note>
-        </ion-item>
+          <ion-item>
+            <ion-label position="floating">Email</ion-label>
+            <ion-input formControlName="email" type="email"></ion-input>
+            <ion-note slot="error" *ngIf="form.get('email').touched">
+              {{ getErrorMessage('email') }}
+            </ion-note>
+          </ion-item>
 
-        <!-- Motivo -->
-        <ion-item class="ion-margin-vertical">
-          <ion-label position="floating">Motivo de la Solicitud</ion-label>
-          <ion-textarea
-            formControlName="motivo"
-            rows="4"
-            placeholder="Describa el motivo de su solicitud"
-          >
-          </ion-textarea>
-          <ion-note slot="error" *ngIf="hasError('motivo', 'required')">
-            El motivo es requerido
-          </ion-note>
-          <ion-note slot="error" *ngIf="hasError('motivo', 'minlength')">
-            El motivo debe tener al menos 10 caracteres
-          </ion-note>
-        </ion-item>
-      </ion-list>
-
-      <div class="ion-padding">
-        <ion-button expand="block" type="submit" [disabled]="form.invalid">
-          <ion-icon name="document-text-outline" slot="start"></ion-icon>
-          Generar Constancia
-        </ion-button>
-
-        <ion-button
-          expand="block"
-          fill="outline"
-          (click)="resetForm()"
-          class="ion-margin-top"
-        >
-          <ion-icon name="refresh-outline" slot="start"></ion-icon>
-          Limpiar Formulario
-        </ion-button>
-      </div>
-    </form>
-  </div>
-
-  <!-- Sección de Historial -->
-  <div *ngIf="selectedSegment === 'historial'" class="ion-padding">
-    <ion-list>
-      <ion-item
-        *ngFor="let constancia of constancias | async"
-        class="constancia-item"
-      >
-        <ion-grid>
-          <ion-row>
-            <ion-col size="12">
-              <h2>Constancia de {{ constancia.tipo | titlecase }}</h2>
-            </ion-col>
-          </ion-row>
-          <ion-row>
-            <ion-col size="12" size-md="6">
-              <p>
-                <ion-icon name="person-outline"></ion-icon>
-                {{ constancia.nombre }} {{ constancia.apellidos }}
-              </p>
-              <p>
-                <ion-icon name="calendar-outline"></ion-icon>
-                {{ constancia.createdAt | date:'dd/MM/yyyy' }}
-              </p>
-            </ion-col>
-            <ion-col size="12" size-md="6" class="ion-text-right">
-              <ion-badge [color]="getStatusColor(constancia.estado)">
-                {{ constancia.estado | titlecase }}
-              </ion-badge>
-
-              <ion-button
-                [disabled]="constancia.estado !== 'aprobada'"
-                (click)="generarPDF(constancia)"
-                fill="clear"
+          <ion-item>
+            <ion-label position="floating">Tipo de Constancia</ion-label>
+            <ion-select formControlName="tipo">
+              <ion-select-option
+                *ngFor="let tipo of tiposConstancia"
+                [value]="tipo.value"
               >
-                <ion-icon
-                  [name]="constancia.estado === 'aprobada' ? 'download-outline' : 'lock-closed-outline'"
-                  slot="icon-only"
-                >
-                </ion-icon>
-              </ion-button>
-            </ion-col>
-          </ion-row>
-        </ion-grid>
-      </ion-item>
-    </ion-list>
+                {{ tipo.label }}
+              </ion-select-option>
+            </ion-select>
+            <ion-note slot="error" *ngIf="form.get('tipo').touched">
+              {{ getErrorMessage('tipo') }}
+            </ion-note>
+          </ion-item>
 
-    <!-- Mensaje cuando no hay constancias -->
-    <div *ngIf="(constancias | async)?.length === 0" class="empty-state">
-      <ion-icon name="documents-outline"></ion-icon>
-      <h3>No hay constancias</h3>
-      <p>Aún no has generado ninguna constancia</p>
-    </div>
+          <ion-item>
+            <ion-label position="floating">Motivo</ion-label>
+            <ion-textarea
+              formControlName="motivo"
+              rows="3"
+              placeholder="Describa el motivo de la solicitud"
+            ></ion-textarea>
+            <ion-note slot="error" *ngIf="form.get('motivo').touched">
+              {{ getErrorMessage('motivo') }}
+            </ion-note>
+          </ion-item>
+
+          <ion-button
+            expand="block"
+            type="submit"
+            class="ion-margin-top"
+            [disabled]="form.invalid || loading"
+          >
+            <ion-icon name="save-outline" slot="start"></ion-icon>
+            Registrar Constancia
+          </ion-button>
+        </ion-card-content>
+      </ion-card>
+    </form>
   </div>
 </ion-content>

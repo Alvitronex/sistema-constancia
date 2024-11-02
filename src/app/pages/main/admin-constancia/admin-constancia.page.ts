@@ -6,6 +6,7 @@ import { FirebaseService } from 'src/app/services/firebase.service';
 import { UtilsService } from 'src/app/services/utils.service';
 import { Constancia } from 'src/app/models/constancia.model';
 import { orderBy } from '@angular/fire/firestore';
+import { groupBy } from 'lodash';
 
 declare var pdfMake: any;
 
@@ -113,7 +114,7 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
     estado: string
   ): Constancia[] {
     searchTerm = searchTerm || '';
-    
+
     return constancias.filter(constancia => {
       const searchString = [
         constancia.nombre,
@@ -166,7 +167,7 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
             try {
               await loading.present();
               await this.firebaseSvc.updateConstanciaStatus(constancia.id, newStatus);
-              
+
               this.utilsSvc.presentToast({
                 message: 'Estado actualizado correctamente',
                 color: 'success',
@@ -223,7 +224,7 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
       const docDefinition = {
         content: [
           { text: 'CONSTANCIA', style: 'header' },
-          { 
+          {
             text: [
               { text: '\nTipo de Constancia: ', bold: true },
               constancia.tipo
@@ -290,4 +291,162 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
     await this.loadConstancias();
     event?.target?.complete();
   }
+  async generateMonthlyReport() {
+    const loading = await this.utilsSvc.loading();
+    try {
+      await loading.present();
+
+      // Obtener todas las constancias
+      const constancias = this.allConstancias;
+
+      // Agrupar constancias por mes
+      const constanciasPorMes = this.groupConstanciasByMonth(constancias);
+
+      // Generar datos para el informe
+      const reportData = this.prepareReportData(constanciasPorMes);
+
+      // Crear el PDF
+      const docDefinition = {
+        content: [
+          {
+            text: 'INFORME DE CONSTANCIAS POR MES',
+            style: 'header'
+          },
+          {
+            text: `Fecha de generación: ${new Date().toLocaleDateString()}`,
+            alignment: 'right',
+            margin: [0, 0, 0, 20]
+          },
+          // Tabla de resumen
+          {
+            table: {
+              headerRows: 1,
+              widths: ['*', 'auto', 'auto', 'auto', 'auto'],
+              body: [
+                [
+                  { text: 'Mes', style: 'tableHeader' },
+                  { text: 'Total', style: 'tableHeader' },
+                  { text: 'Pendientes', style: 'tableHeader' },
+                  { text: 'Aprobadas', style: 'tableHeader' },
+                  { text: 'Rechazadas', style: 'tableHeader' }
+                ],
+                ...reportData.map(row => [
+                  row.mes,
+                  row.total,
+                  row.pendientes,
+                  row.aprobadas,
+                  row.rechazadas
+                ])
+              ]
+            }
+          },
+          // Gráfico de resumen (representación texto)
+          {
+            text: '\nResumen Anual',
+            style: 'subheader',
+            margin: [0, 20, 0, 10]
+          },
+          {
+            text: [
+              { text: '\nTotal de Constancias: ', bold: true },
+              constancias.length.toString()
+            ]
+          },
+          {
+            text: [
+              { text: '\nTotal Aprobadas: ', bold: true },
+              constancias.filter(c => c.estado === 'aprobada').length.toString()
+            ]
+          },
+          {
+            text: [
+              { text: '\nTotal Pendientes: ', bold: true },
+              constancias.filter(c => c.estado === 'pendiente').length.toString()
+            ]
+          },
+          {
+            text: [
+              { text: '\nTotal Rechazadas: ', bold: true },
+              constancias.filter(c => c.estado === 'rechazada').length.toString()
+            ]
+          }
+        ],
+        styles: {
+          header: {
+            fontSize: 22,
+            bold: true,
+            alignment: 'center',
+            margin: [0, 0, 0, 20]
+          },
+          subheader: {
+            fontSize: 16,
+            bold: true,
+            margin: [0, 10, 0, 5]
+          },
+          tableHeader: {
+            bold: true,
+            fontSize: 13,
+            color: 'black',
+            fillColor: '#eeeeee'
+          }
+        },
+        defaultStyle: {
+          fontSize: 12
+        }
+      };
+
+      this.utilsSvc.pdfMake();
+      pdfMake.createPdf(docDefinition).download('informe-constancias-mensual.pdf');
+
+      this.utilsSvc.presentToast({
+        message: 'Informe generado correctamente',
+        color: 'success',
+        duration: 2500,
+        position: 'middle'
+      });
+    } catch (error) {
+      console.error('Error al generar informe:', error);
+      this.utilsSvc.presentToast({
+        message: 'Error al generar el informe',
+        color: 'danger',
+        duration: 2500,
+        position: 'middle'
+      });
+    } finally {
+      loading.dismiss();
+    }
+  }
+
+  private groupConstanciasByMonth(constancias: Constancia[]) {
+    return groupBy(constancias, (constancia) => {
+      const fecha = new Date(constancia.createdAt);
+      return `${fecha.getFullYear()}-${(fecha.getMonth() + 1).toString().padStart(2, '0')}`;
+    });
+  }
+
+  private prepareReportData(constanciasPorMes: any) {
+    const meses = Object.keys(constanciasPorMes).sort();
+
+    return meses.map(mes => {
+      const constancias = constanciasPorMes[mes];
+      const [year, month] = mes.split('-');
+
+      return {
+        mes: this.getMonthName(parseInt(month)) + ' ' + year,
+        total: constancias.length,
+        pendientes: constancias.filter(c => c.estado === 'pendiente').length,
+        aprobadas: constancias.filter(c => c.estado === 'aprobada').length,
+        rechazadas: constancias.filter(c => c.estado === 'rechazada').length
+      };
+    });
+  }
+
+  private getMonthName(month: number): string {
+    const meses = [
+      'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+    ];
+    return meses[month - 1];
+  }
+
 }

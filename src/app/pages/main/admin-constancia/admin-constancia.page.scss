@@ -64,3 +64,18 @@ ion-searchbar {
     margin-top: 1rem;
   }
 }
+ion-button {
+  --padding-top: 1rem;
+  --padding-bottom: 1rem;
+
+  ion-icon {
+    margin-right: 8px;
+  }
+}
+
+@media (min-width: 768px) {
+  ion-button {
+    max-width: 300px;
+    margin: 0 auto;
+  }
+}
