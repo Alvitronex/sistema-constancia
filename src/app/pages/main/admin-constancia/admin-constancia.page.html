@@ -1,0 +1,115 @@
+<app-header [showMenu]="true" title="Administracion Constancias"></app-header>
+
+
+<ion-content>
+  <div class="ion-padding">
+    <!-- Filtros y búsqueda -->
+    <ion-grid>
+      <ion-row>
+        <ion-col size="12" size-md="6">
+          <ion-searchbar
+            [formControl]="searchControl"
+            placeholder="Buscar por nombre o documento"
+            animated
+          ></ion-searchbar>
+        </ion-col>
+        <ion-col size="6" size-md="3">
+          <ion-item>
+            <ion-label position="floating">Tipo</ion-label>
+            <ion-select [formControl]="tipoControl">
+              <ion-select-option value="todos">Todos</ion-select-option>
+              <ion-select-option
+                *ngFor="let tipo of tiposConstancia"
+                [value]="tipo.value"
+              >
+                {{ tipo.label }}
+              </ion-select-option>
+            </ion-select>
+          </ion-item>
+        </ion-col>
+        <ion-col size="6" size-md="3">
+          <ion-item>
+            <ion-label position="floating">Estado</ion-label>
+            <ion-select [formControl]="estadoControl">
+              <ion-select-option value="todos">Todos</ion-select-option>
+              <ion-select-option
+                *ngFor="let estado of estadosConstancia"
+                [value]="estado.value"
+              >
+                {{ estado.label }}
+              </ion-select-option>
+            </ion-select>
+          </ion-item>
+        </ion-col>
+      </ion-row>
+    </ion-grid>
+
+    <!-- Lista de constancias -->
+    <ion-list>
+      <ion-item-sliding *ngFor="let constancia of constancias$ | async">
+        <ion-item class="constancia-item">
+          <ion-grid>
+            <ion-row class="ion-align-items-center">
+              <ion-col size="12" size-md="4">
+                <h2>{{ constancia.nombre }} {{ constancia.apellidos }}</h2>
+                <p>{{ constancia.documento }}</p>
+              </ion-col>
+              <ion-col size="6" size-md="2">
+                <ion-badge [color]="getStatusColor(constancia.estado)">
+                  {{ constancia.estado | titlecase }}
+                </ion-badge>
+              </ion-col>
+              <ion-col size="6" size-md="2">
+                <ion-chip color="primary" outline>
+                  {{ constancia.tipo }}
+                </ion-chip>
+              </ion-col>
+              <ion-col size="12" size-md="4" class="ion-text-right">
+                <ion-text color="medium">
+                  {{ constancia.createdAt | date:'dd/MM/yyyy HH:mm' }}
+                </ion-text>
+              </ion-col>
+            </ion-row>
+          </ion-grid>
+        </ion-item>
+
+        <ion-item-options side="end">
+          <ion-item-option
+            *ngIf="constancia.estado === 'pendiente'"
+            color="success"
+            (click)="onUpdateStatus(constancia, 'aprobada')"
+          >
+            <ion-icon slot="icon-only" name="checkmark"></ion-icon>
+          </ion-item-option>
+
+          <ion-item-option
+            *ngIf="constancia.estado === 'pendiente'"
+            color="danger"
+            (click)="onUpdateStatus(constancia, 'rechazada')"
+          >
+            <ion-icon slot="icon-only" name="close"></ion-icon>
+          </ion-item-option>
+
+          <ion-item-option color="primary" (click)="onViewDetails(constancia)">
+            <ion-icon slot="icon-only" name="eye"></ion-icon>
+          </ion-item-option>
+
+          <ion-item-option
+            *ngIf="constancia.estado === 'aprobada'"
+            color="tertiary"
+            (click)="onGeneratePDF(constancia)"
+          >
+            <ion-icon slot="icon-only" name="document"></ion-icon>
+          </ion-item-option>
+        </ion-item-options>
+      </ion-item-sliding>
+    </ion-list>
+
+    <!-- Estado vacío -->
+    <div class="empty-state" *ngIf="(constancias$ | async)?.length === 0">
+      <ion-icon name="documents-outline" class="large-icon"></ion-icon>
+      <h3>No hay constancias</h3>
+      <p>No se encontraron constancias registradas</p>
+    </div>
+  </div>
+</ion-content>

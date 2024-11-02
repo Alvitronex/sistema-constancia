@@ -15,6 +15,10 @@ export class MainPage implements OnInit {
     { title: 'Inicio', url: '/main/home', icon: 'home-outline' },
     { title: 'Perfil', url: '/main/profile', icon: 'person-outline' },
     { title: 'Panel Administrativo', url: '/main/panel', icon: 'people-outline' },
+    { title: 'Constancias', url: '/main/user-constancia', icon: 'document-outline' },
+    { title: 'Administración Constancias', url: '/main/admin-constancia', icon: 'ribbon-outline' },
+
+
 
   ]
 

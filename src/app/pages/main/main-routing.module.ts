@@ -19,9 +19,19 @@ const routes: Routes = [
         path: 'panel',
         loadChildren: () => import('./panel/panel.module').then(m => m.PanelPageModule)
       },
+      {
+        path: 'user-constancia',
+        loadChildren: () => import('./user-constancia/user-constancia.module').then(m => m.UserConstanciaPageModule)
+      },
+      {
+        path: 'admin-constancia',
+        loadChildren: () => import('./admin-constancia/admin-constancia.module').then(m => m.AdminConstanciaPageModule)
+      }
 
     ]
   },
+
+
 
 
 
