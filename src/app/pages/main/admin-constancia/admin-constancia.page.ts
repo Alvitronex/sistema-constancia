@@ -7,6 +7,8 @@ import { UtilsService } from 'src/app/services/utils.service';
 import { Constancia } from 'src/app/models/constancia.model';
 import { orderBy } from '@angular/fire/firestore';
 import { groupBy } from 'lodash';
+import { ModalController } from '@ionic/angular';
+import { ConstanciaDetailComponent } from 'src/app/shared/components/constancia-detail/constancia-detail.component';
 
 declare var pdfMake: any;
 
@@ -25,7 +27,8 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
   estadoControl = new FormControl('todos');
   private destroy$ = new Subject<void>();
   private allConstancias: Constancia[] = [];
-
+  availableMonths: { year: number, month: number }[] = [];
+  selectedMonths: { year: number, month: number }[] = [];
   // Tipos de constancias disponibles
   tiposConstancia = [
     { value: 'LABORAL', label: 'Laboral' },
@@ -42,14 +45,21 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
 
   constructor(
     private firebaseSvc: FirebaseService,
-    private utilsSvc: UtilsService
+    private utilsSvc: UtilsService,
+    private modalController: ModalController
   ) { }
 
+  async openConstanciaDetail(constancia: Constancia) {
+    const modal = await this.modalController.create({
+      component: ConstanciaDetailComponent,
+      componentProps: { constancia }
+    });
+    return await modal.present();
+  }
+
   ngOnInit() {
-    this.searchControl = new FormControl('');
-    this.tipoControl = new FormControl('todos');
-    this.estadoControl = new FormControl('todos');
     this.loadConstancias();
+    this.loadAvailableMonths();
   }
 
   ngOnDestroy() {
@@ -57,6 +67,16 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
     this.destroy$.complete();
   }
 
+  private loadAvailableMonths() {
+    // Obtener las fechas únicas de las constancias
+    const dates = [...new Set(this.allConstancias.map(c => c.createdAt))];
+
+    // Generar la lista de meses disponibles
+    this.availableMonths = dates.map(date => {
+      const d = new Date(date);
+      return { year: d.getFullYear(), month: d.getMonth() + 1 };
+    });
+  }
   private loadConstancias() {
     try {
       this.loading = true;
@@ -66,13 +86,6 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
         'constancias',
         [orderBy('createdAt', 'desc')]
       ) as Observable<Constancia[]>;
-
-      // Log para verificar la carga inicial
-      console.log('Iniciando carga de constancias');
-
-      this.searchControl.valueChanges.subscribe(value => {
-        console.log('Término de búsqueda:', value);
-      });
 
       this.filteredConstancias$ = combineLatest([
         constanciasRef,
@@ -87,14 +100,6 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
         map(([constancias, searchTerm, tipo, estado]) => {
           this.allConstancias = constancias;
           this.loading = false;
-
-          console.log('Datos a filtrar:', {
-            totalConstancias: constancias.length,
-            searchTerm,
-            tipo,
-            estado
-          });
-
           return this.filterConstancias(constancias, searchTerm, tipo, estado);
         }),
         takeUntil(this.destroy$)
@@ -127,14 +132,6 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
       const matchesSearch = searchString.includes(termToSearch);
       const matchesTipo = tipo === 'todos' || constancia.tipo === tipo;
       const matchesEstado = estado === 'todos' || constancia.estado === estado;
-
-      // Log del resultado de la búsqueda
-      console.log('Filtro aplicado:', {
-        constancia: constancia.nombre,
-        searchMatch: matchesSearch,
-        tipoMatch: matchesTipo,
-        estadoMatch: matchesEstado
-      });
 
       return matchesSearch && matchesTipo && matchesEstado;
     });
@@ -191,21 +188,6 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
     });
   }
 
-  async onViewDetails(constancia: Constancia) {
-    await this.utilsSvc.presentAlert({
-      header: 'Detalles de la Constancia',
-      subHeader: `${constancia.tipo} - ${constancia.estado.toUpperCase()}`,
-      message: `
-        <strong>Solicitante:</strong> ${constancia.nombre} ${constancia.apellidos}<br>
-        <strong>Documento:</strong> ${constancia.documento}<br>
-        <strong>Motivo:</strong> ${constancia.motivo}<br>
-        <strong>Fecha:</strong> ${new Date(constancia.createdAt).toLocaleString()}<br>
-        <strong>Email:</strong> ${constancia.userEmail}
-      `,
-      buttons: ['Cerrar']
-    });
-  }
-
   async onGeneratePDF(constancia: Constancia) {
     if (constancia.estado !== 'aprobada') {
       this.utilsSvc.presentToast({
@@ -220,40 +202,15 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
     const loading = await this.utilsSvc.loading();
     try {
       await loading.present();
-
       const docDefinition = {
         content: [
           { text: 'CONSTANCIA', style: 'header' },
-          {
-            text: [
-              { text: '\nTipo de Constancia: ', bold: true },
-              constancia.tipo
-            ]
-          },
-          {
-            text: [
-              { text: '\nNombre Completo: ', bold: true },
-              `${constancia.nombre} ${constancia.apellidos}`
-            ]
-          },
-          {
-            text: [
-              { text: '\nDocumento: ', bold: true },
-              constancia.documento
-            ]
-          },
-          {
-            text: [
-              { text: '\nMotivo: ', bold: true },
-              constancia.motivo
-            ]
-          },
-          {
-            text: [
-              { text: '\nFecha de Emisión: ', bold: true },
-              new Date().toLocaleDateString()
-            ]
-          }
+          { text: '\n' },
+          { text: [{ text: '\nTipo de Constancia: ', bold: true }, constancia.tipo] },
+          { text: [{ text: '\nNombre Completo: ', bold: true }, `${constancia.nombre} ${constancia.apellidos}`] },
+          { text: [{ text: '\nDocumento: ', bold: true }, constancia.documento] },
+          { text: [{ text: '\nMotivo: ', bold: true }, constancia.motivo] },
+          { text: [{ text: '\nFecha de Emisión: ', bold: true }, new Date().toLocaleDateString()] }
         ],
         styles: {
           header: {
@@ -286,124 +243,132 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
       loading.dismiss();
     }
   }
-
-  async handleRefresh(event?: any) {
-    await this.loadConstancias();
-    event?.target?.complete();
-  }
   async generateMonthlyReport() {
-    const loading = await this.utilsSvc.loading();
     try {
-      await loading.present();
+      // Lógica para generar el informe mensual
+      const loading = await this.utilsSvc.loading();
+      try {
+        await loading.present();
 
-      // Obtener todas las constancias
-      const constancias = this.allConstancias;
+        // Obtener todas las constancias
+        const constancias = this.allConstancias;
 
-      // Agrupar constancias por mes
-      const constanciasPorMes = this.groupConstanciasByMonth(constancias);
+        // Agrupar constancias por mes
+        const constanciasPorMes = this.groupConstanciasByMonth(constancias);
 
-      // Generar datos para el informe
-      const reportData = this.prepareReportData(constanciasPorMes);
+        // Generar datos para el informe
+        const reportData = this.prepareReportData(constanciasPorMes);
 
-      // Crear el PDF
-      const docDefinition = {
-        content: [
-          {
-            text: 'INFORME DE CONSTANCIAS POR MES',
-            style: 'header'
-          },
-          {
-            text: `Fecha de generación: ${new Date().toLocaleDateString()}`,
-            alignment: 'right',
-            margin: [0, 0, 0, 20]
-          },
-          // Tabla de resumen
-          {
-            table: {
-              headerRows: 1,
-              widths: ['*', 'auto', 'auto', 'auto', 'auto'],
-              body: [
-                [
-                  { text: 'Mes', style: 'tableHeader' },
-                  { text: 'Total', style: 'tableHeader' },
-                  { text: 'Pendientes', style: 'tableHeader' },
-                  { text: 'Aprobadas', style: 'tableHeader' },
-                  { text: 'Rechazadas', style: 'tableHeader' }
-                ],
-                ...reportData.map(row => [
-                  row.mes,
-                  row.total,
-                  row.pendientes,
-                  row.aprobadas,
-                  row.rechazadas
-                ])
+        // Crear el PDF
+        const docDefinition = {
+          content: [
+            {
+              text: 'INFORME DE CONSTANCIAS POR MES',
+              style: 'header'
+            },
+            {
+              text: `Fecha de generación: ${new Date().toLocaleDateString()}`,
+              alignment: 'right',
+              margin: [0, 0, 0, 20]
+            },
+            // Tabla de resumen
+            {
+              table: {
+                headerRows: 1,
+                widths: ['*', 'auto', 'auto', 'auto', 'auto'],
+                body: [
+                  [
+                    { text: 'Mes', style: 'tableHeader' },
+                    { text: 'Total', style: 'tableHeader' },
+                    { text: 'Pendientes', style: 'tableHeader' },
+                    { text: 'Aprobadas', style: 'tableHeader' },
+                    { text: 'Rechazadas', style: 'tableHeader' }
+                  ],
+                  ...reportData.map(row => [
+                    row.mes,
+                    row.total,
+                    row.pendientes,
+                    row.aprobadas,
+                    row.rechazadas
+                  ])
+                ]
+              }
+            },
+            // Gráfico de resumen (representación texto)
+            {
+              text: '\nResumen Anual',
+              style: 'subheader',
+              margin: [0, 20, 0, 10]
+            },
+            {
+              text: [
+                { text: '\nTotal de Constancias: ', bold: true },
+                constancias.length.toString()
+              ]
+            },
+            {
+              text: [
+                { text: '\nTotal Aprobadas: ', bold: true },
+                constancias.filter(c => c.estado === 'aprobada').length.toString()
+              ]
+            },
+            {
+              text: [
+                { text: '\nTotal Pendientes: ', bold: true },
+                constancias.filter(c => c.estado === 'pendiente').length.toString()
+              ]
+            },
+            {
+              text: [
+                { text: '\nTotal Rechazadas: ', bold: true },
+                constancias.filter(c => c.estado === 'rechazada').length.toString()
               ]
             }
+          ],
+          styles: {
+            header: {
+              fontSize: 22,
+              bold: true,
+              alignment: 'center',
+              margin: [0, 0, 0, 20]
+            },
+            subheader: {
+              fontSize: 16,
+              bold: true,
+              margin: [0, 10, 0, 5]
+            },
+            tableHeader: {
+              bold: true,
+              fontSize: 13,
+              color: 'black',
+              fillColor: '#eeeeee'
+            }
           },
-          // Gráfico de resumen (representación texto)
-          {
-            text: '\nResumen Anual',
-            style: 'subheader',
-            margin: [0, 20, 0, 10]
-          },
-          {
-            text: [
-              { text: '\nTotal de Constancias: ', bold: true },
-              constancias.length.toString()
-            ]
-          },
-          {
-            text: [
-              { text: '\nTotal Aprobadas: ', bold: true },
-              constancias.filter(c => c.estado === 'aprobada').length.toString()
-            ]
-          },
-          {
-            text: [
-              { text: '\nTotal Pendientes: ', bold: true },
-              constancias.filter(c => c.estado === 'pendiente').length.toString()
-            ]
-          },
-          {
-            text: [
-              { text: '\nTotal Rechazadas: ', bold: true },
-              constancias.filter(c => c.estado === 'rechazada').length.toString()
-            ]
+          defaultStyle: {
+            fontSize: 12
           }
-        ],
-        styles: {
-          header: {
-            fontSize: 22,
-            bold: true,
-            alignment: 'center',
-            margin: [0, 0, 0, 20]
-          },
-          subheader: {
-            fontSize: 16,
-            bold: true,
-            margin: [0, 10, 0, 5]
-          },
-          tableHeader: {
-            bold: true,
-            fontSize: 13,
-            color: 'black',
-            fillColor: '#eeeeee'
-          }
-        },
-        defaultStyle: {
-          fontSize: 12
-        }
-      };
+        };
 
-      this.utilsSvc.pdfMake();
-      pdfMake.createPdf(docDefinition).download('informe-constancias-mensual.pdf');
+        this.utilsSvc.pdfMake();
+        pdfMake.createPdf(docDefinition).download('informe-constancias-mensual.pdf');
 
-      this.utilsSvc.presentToast({
-        message: 'Informe generado correctamente',
-        color: 'success',
-        duration: 2500,
-        position: 'middle'
-      });
+        this.utilsSvc.presentToast({
+          message: 'Informe generado correctamente',
+          color: 'success',
+          duration: 2500,
+          position: 'middle'
+        });
+      } catch (error) {
+        console.error('Error al generar informe:', error);
+        this.utilsSvc.presentToast({
+          message: 'Error al generar el informe',
+          color: 'danger',
+          duration: 2500,
+          position: 'middle'
+        });
+      } finally {
+        loading.dismiss();
+      }
     } catch (error) {
       console.error('Error al generar informe:', error);
       this.utilsSvc.presentToast({
@@ -412,8 +377,6 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
         duration: 2500,
         position: 'middle'
       });
-    } finally {
-      loading.dismiss();
     }
   }
 
@@ -448,5 +411,4 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
     ];
     return meses[month - 1];
   }
-
 }

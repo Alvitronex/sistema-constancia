@@ -7,14 +7,16 @@ import { IonicModule } from '@ionic/angular';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { AddUpdateProductComponent } from './components/add-update-product/add-update-product.component';
 import { AddUpdateUserComponent } from './components/add-update-user/add-update-user.component';
+import { ConstanciaDetailComponent } from './components/constancia-detail/constancia-detail.component';
 
 @NgModule({
   declarations: [
     HeaderComponent,
     CustomInputComponent,
     LogoComponent,
-    AddUpdateProductComponent, 
-    AddUpdateUserComponent
+    AddUpdateProductComponent,
+    AddUpdateUserComponent,
+    ConstanciaDetailComponent
 
   ],
   exports: [
@@ -22,7 +24,8 @@ import { AddUpdateUserComponent } from './components/add-update-user/add-update-
     CustomInputComponent,
     LogoComponent,
     ReactiveFormsModule,
-    AddUpdateProductComponent
+    AddUpdateProductComponent,
+    ConstanciaDetailComponent
   ],
   imports: [
     CommonModule,

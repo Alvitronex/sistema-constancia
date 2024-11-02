@@ -1,0 +1,25 @@
+// src/app/components/constancia-detail/constancia-detail.component.scss
+.constancia-container {
+  padding: 5px;
+}
+
+.constancia-title {
+  font-size: 24px;
+  font-weight: bold;
+  color: #333;
+}
+
+.constancia-estado {
+  font-size: 18px;
+  color: #666;
+}
+
+.constancia-label {
+  flex: 0 0 120px;
+  font-weight: bold;
+  color: #333;
+}
+
+.constancia-value {
+  color: #666;
+}
