@@ -1,3 +1,4 @@
+// Estado vacío
 .empty-state {
   text-align: center;
   padding: 2rem;
@@ -15,8 +16,13 @@
   p {
     color: var(--ion-color-medium);
   }
+
+  ion-button {
+    margin-top: 1rem;
+  }
 }
 
+// Item de constancia
 .constancia-item {
   h2 {
     font-weight: 500;
@@ -33,16 +39,7 @@
   }
 }
 
-ion-searchbar {
-  --background: var(--ion-color-light);
-  --border-radius: 8px;
-}
-
-ion-item-options {
-  ion-item-option {
-    padding: 0 1rem;
-  }
-}
+// Barra de búsqueda
 ion-searchbar {
   --background: var(--ion-color-light);
   --border-radius: 8px;
@@ -53,17 +50,21 @@ ion-searchbar {
   }
 }
 
+// Opciones de items
+ion-item-options {
+  ion-item-option {
+    padding: 0 1rem;
+  }
+}
+
+// Badges de filtros
 .filter-badge {
   margin-right: 0.5rem;
   --padding-start: 8px;
   --padding-end: 8px;
 }
 
-.empty-state {
-  ion-button {
-    margin-top: 1rem;
-  }
-}
+// Botones
 ion-button {
   --padding-top: 1rem;
   --padding-bottom: 1rem;
@@ -73,6 +74,23 @@ ion-button {
   }
 }
 
+// Contenedor de paginación
+.pagination-container {
+  margin-top: 20px;
+
+  ion-button {
+    --padding-start: 8px;
+    --padding-end: 8px;
+    margin: 0 2px;
+  }
+
+  ion-select {
+    --padding-start: 8px;
+    min-width: 120px;
+  }
+}
+
+// Media queries
 @media (min-width: 768px) {
   ion-button {
     max-width: 300px;

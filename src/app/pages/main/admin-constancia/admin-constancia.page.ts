@@ -1,7 +1,7 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { FormControl } from '@angular/forms';
-import { Observable, Subject, combineLatest } from 'rxjs';
-import { takeUntil, debounceTime, distinctUntilChanged, map, startWith } from 'rxjs/operators';
+import { Observable, Subject, combineLatest, of } from 'rxjs';
+import { takeUntil, debounceTime, distinctUntilChanged, map, startWith, take } from 'rxjs/operators';
 import { FirebaseService } from 'src/app/services/firebase.service';
 import { UtilsService } from 'src/app/services/utils.service';
 import { Constancia } from 'src/app/models/constancia.model';
@@ -29,6 +29,13 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
   private allConstancias: Constancia[] = [];
   availableMonths: { year: number, month: number }[] = [];
   selectedMonths: { year: number, month: number }[] = [];
+
+  Math = Math; // Para usar Math en el template
+  paginatedConstancias: Constancia[] = [];
+  pageSize: number = 5;
+  currentPage: number = 1;
+  totalPages: number = 1;
+  pages: number[] = [];
   // Tipos de constancias disponibles
   tiposConstancia = [
     { value: 'LABORAL', label: 'Laboral' },
@@ -77,41 +84,6 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
       return { year: d.getFullYear(), month: d.getMonth() + 1 };
     });
   }
-  private loadConstancias() {
-    try {
-      this.loading = true;
-      this.error = false;
-
-      const constanciasRef = this.firebaseSvc.getCollectionData(
-        'constancias',
-        [orderBy('createdAt', 'desc')]
-      ) as Observable<Constancia[]>;
-
-      this.filteredConstancias$ = combineLatest([
-        constanciasRef,
-        this.searchControl.valueChanges.pipe(
-          startWith(''),
-          debounceTime(300),
-          distinctUntilChanged()
-        ),
-        this.tipoControl.valueChanges.pipe(startWith('todos')),
-        this.estadoControl.valueChanges.pipe(startWith('todos'))
-      ]).pipe(
-        map(([constancias, searchTerm, tipo, estado]) => {
-          this.allConstancias = constancias;
-          this.loading = false;
-          return this.filterConstancias(constancias, searchTerm, tipo, estado);
-        }),
-        takeUntil(this.destroy$)
-      );
-
-    } catch (error) {
-      console.error('Error in loadConstancias:', error);
-      this.error = true;
-      this.loading = false;
-    }
-  }
-
   private filterConstancias(
     constancias: Constancia[],
     searchTerm: string,
@@ -136,12 +108,109 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
       return matchesSearch && matchesTipo && matchesEstado;
     });
   }
+  private loadConstancias() {
+    try {
+      this.loading = true;
+      this.error = false;
 
+      const constanciasRef = this.firebaseSvc.getCollectionData(
+        'constancias',
+        [orderBy('createdAt', 'desc')]
+      ) as Observable<Constancia[]>;
+
+      // Combinar todos los observables de filtros
+      this.filteredConstancias$ = combineLatest([
+        constanciasRef,
+        this.searchControl.valueChanges.pipe(startWith('')),
+        this.tipoControl.valueChanges.pipe(startWith('todos')),
+        this.estadoControl.valueChanges.pipe(startWith('todos'))
+      ]).pipe(
+        debounceTime(300),
+        map(([constancias, searchTerm, tipo, estado]) => {
+          this.allConstancias = constancias;
+          const filtered = this.filterConstancias(constancias, searchTerm, tipo, estado);
+          this.totalPages = Math.ceil(filtered.length / this.pageSize);
+
+          // Reset a primera página cuando cambian los filtros
+          if (this.currentPage > this.totalPages) {
+            this.currentPage = 1;
+          }
+
+          this.updatePaginatedConstancias(filtered);
+          this.updatePagination();
+          this.loading = false;
+          return filtered;
+        }),
+        takeUntil(this.destroy$)
+      );
+
+      // Mantener la suscripción activa
+      this.filteredConstancias$.subscribe();
+
+    } catch (error) {
+      console.error('Error in loadConstancias:', error);
+      this.error = true;
+      this.loading = false;
+    }
+  }
+
+  // Agregar métodos de paginación
+  updatePaginatedConstancias(constancias: Constancia[]) {
+    const start = (this.currentPage - 1) * this.pageSize;
+    const end = start + this.pageSize;
+    this.paginatedConstancias = constancias.slice(start, end);
+  }
+
+  updatePagination() {
+    let startPage = Math.max(1, this.currentPage - 2);
+    let endPage = Math.min(this.totalPages, startPage + 4);
+
+    if (endPage - startPage < 4) {
+      startPage = Math.max(1, endPage - 4);
+    }
+
+    this.pages = Array.from(
+      { length: endPage - startPage + 1 },
+      (_, i) => startPage + i
+    );
+  }
+
+  goToPage(page: number) {
+    if (page >= 1 && page <= this.totalPages) {
+      this.currentPage = page;
+      // Actualizar con los filtros actuales
+      combineLatest([
+        of(this.allConstancias),
+        of(this.searchControl.value || ''),
+        of(this.tipoControl.value || 'todos'),
+        of(this.estadoControl.value || 'todos')
+      ]).pipe(
+        take(1),
+        map(([constancias, searchTerm, tipo, estado]) => {
+          const filtered = this.filterConstancias(constancias, searchTerm, tipo, estado);
+          this.updatePaginatedConstancias(filtered);
+          this.updatePagination();
+        })
+      ).subscribe();
+    }
+  }
+
+  nextPage() {
+    this.goToPage(this.currentPage + 1);
+  }
+
+  prevPage() {
+    this.goToPage(this.currentPage - 1);
+  }
+
+  // Modificar el método clearFilters existente
   clearFilters() {
     this.searchControl.setValue('');
     this.tipoControl.setValue('todos');
     this.estadoControl.setValue('todos');
+    this.currentPage = 1; // Resetear a la primera página
   }
+
 
   getStatusColor(estado: string): string {
     const estadoFound = this.estadosConstancia.find(e => e.value === estado);
@@ -151,6 +220,7 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
   async onUpdateStatus(constancia: Constancia, newStatus: string) {
     const alert = await this.utilsSvc.presentAlert({
       header: 'Confirmar cambio',
+      mode: 'ios',
       message: `¿Está seguro de cambiar el estado a "${newStatus}"?`,
       buttons: [
         {

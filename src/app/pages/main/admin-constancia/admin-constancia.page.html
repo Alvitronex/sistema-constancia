@@ -57,7 +57,7 @@
     </ion-row>
     <!-- Lista de constancias -->
     <ion-list>
-      <ion-item-sliding *ngFor="let constancia of filteredConstancias$ | async">
+      <ion-item-sliding *ngFor="let constancia of paginatedConstancias">
         <!-- Item principal -->
         <ion-item class="constancia-item">
           <ion-grid>
@@ -125,7 +125,38 @@
         </ion-item-options>
       </ion-item-sliding>
     </ion-list>
-
+    <!-- Agregar el paginador -->
+    <ion-grid *ngIf="!loading && pages.length > 0">
+      <ion-row class="ion-justify-content-center">
+        <ion-col size="auto">
+          <ion-button
+            fill="clear"
+            (click)="prevPage()"
+            [disabled]="currentPage === 1"
+          >
+            <ion-icon name="chevron-back-outline"></ion-icon>
+          </ion-button>
+        </ion-col>
+        <ion-col size="auto" *ngFor="let page of pages">
+          <ion-button
+            fill="clear"
+            [color]="page === currentPage ? 'primary' : 'medium'"
+            (click)="goToPage(page)"
+          >
+            {{ page }}
+          </ion-button>
+        </ion-col>
+        <ion-col size="auto">
+          <ion-button
+            fill="clear"
+            (click)="nextPage()"
+            [disabled]="currentPage === totalPages"
+          >
+            <ion-icon name="chevron-forward-outline"></ion-icon>
+          </ion-button>
+        </ion-col>
+      </ion-row>
+    </ion-grid>
     <!-- Estado vacío -->
     <div
       class="empty-state"
