@@ -32,7 +32,7 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
 
   Math = Math; // Para usar Math en el template
   paginatedConstancias: Constancia[] = [];
-  pageSize: number = 5;
+  pageSize: number = 8;
   currentPage: number = 1;
   totalPages: number = 1;
   pages: number[] = [];

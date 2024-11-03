@@ -17,7 +17,24 @@ const routes: Routes = [
     path: 'main',
     loadChildren: () => import('./pages/main/main.module').then(m => m.MainPageModule), canActivate: [AuthGuard]
   },
-
+  // {
+  //   path: 'panel',
+  //   loadChildren: () => import('./pages/panel/panel.module').then(m => m.PanelPageModule),
+  //   canActivate: [AuthGuard],
+  //   data: { requiredRole: 'planillero' }
+  // },
+  // {
+  //   path: 'admin-constancia',
+  //   loadChildren: () => import('./pages/admin-constancia/admin-constancia.module').then(m => m.AdminConstanciaPageModule),
+  //   canActivate: [AuthGuard],
+  //   data: { requiredRole: 'planillero' }
+  // },
+  // {
+  //   path: 'user-constancia',
+  //   loadChildren: () => import('./pages/user-constancia/user-constancia.module').then(m => m.UserConstanciaPageModule),
+  //   canActivate: [AuthGuard],
+  //   data: { requiredRole: 'usuario' }
+  // }
 ];
 
 @NgModule({

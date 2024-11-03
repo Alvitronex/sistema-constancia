@@ -1,0 +1,25 @@
+ion-item {
+  --background: var(--ion-color-light);
+  --border-radius: 10px;
+  --border-color: var(--ion-color-medium);
+  margin-bottom: 16px;
+
+  &.ion-invalid.ion-touched {
+    --border-color: var(--ion-color-danger);
+  }
+
+  ion-label {
+    font-size: 14px;
+    --color: var(--ion-color-medium);
+  }
+
+  ion-select {
+    width: 100%;
+    padding: 10px;
+  }
+
+  ion-icon {
+    font-size: 20px;
+    margin-right: 8px;
+  }
+}

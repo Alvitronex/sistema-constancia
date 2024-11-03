@@ -9,22 +9,26 @@ import { UtilsService } from 'src/app/services/utils.service';
   templateUrl: './sign-up.page.html',
   styleUrls: ['./sign-up.page.scss'],
 })
-export class SignUpPage implements OnInit {
+export class SignUpPage {
 
   form = new FormGroup({
     uid: new FormControl(''),
     email: new FormControl('', [Validators.required, Validators.email]),
     password: new FormControl('', [Validators.required]),
     name: new FormControl('', [Validators.required, Validators.minLength(4)]),
+    role: new FormControl('', [Validators.required]), // Agregar control para el rol
   });
-
+  roles = [
+    { id: 'usuario', name: 'Usuario' },
+    { id: 'planillero', name: 'Planillero' },
+    { id: 'admin', name: 'Administrador' }
+  ];
   firebaseSvc = inject(FirebaseService);
   utilsSvc = inject(UtilsService);
 
-  ngOnInit() {
-  }
 
- async submit() {
+
+  async submit() {
     if (this.form.valid) {
 
       const loading = await this.utilsSvc.loading();
@@ -71,9 +75,9 @@ export class SignUpPage implements OnInit {
 
       this.firebaseSvc.setDocument(path, this.form.value).then(async res => {
 
-      this.utilsSvc.saveInLocalStorage('user', this.form.value);
-      this.utilsSvc.routerLink('/main/home');
-      this.form.reset();
+        this.utilsSvc.saveInLocalStorage('user', this.form.value);
+        this.utilsSvc.routerLink('/main/home');
+        this.form.reset();
 
 
       }).catch(error => {
