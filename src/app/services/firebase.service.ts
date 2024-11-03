@@ -141,4 +141,24 @@ export class FirebaseService {
     const path = `constancias/${constanciaId}`;
     return await this.getDocument(path) as Constancia;
   }
+  async deleteConstancia(constanciaId: string) {
+    try {
+      const path = `constancias/${constanciaId}`;
+      await this.deleteDocument(path);
+      return true;
+    } catch (error) {
+      console.error('Error al eliminar constancia:', error);
+      throw error;
+    }
+  }
+  async updateConstanciaData(constanciaId: string, data: Partial<Constancia>) {
+    try {
+      const path = `constancias/${constanciaId}`;
+      await this.updateDocument(path, data);
+      return true;
+    } catch (error) {
+      console.error('Error al actualizar constancia:', error);
+      throw error;
+    }
+  }
 }

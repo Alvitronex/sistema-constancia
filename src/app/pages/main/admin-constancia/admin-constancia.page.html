@@ -94,6 +94,7 @@
         </ion-item>
 
         <!-- Opciones deslizables -->
+        <!-- Modificar la sección de ion-item-options en admin-constancia.page.html -->
         <ion-item-options side="end">
           <!-- Aprobar constancia -->
           <ion-item-option
@@ -113,7 +114,14 @@
             <ion-icon slot="icon-only" name="close"></ion-icon>
           </ion-item-option>
 
-          <!-- Ver detalles -->
+          <!-- Editar constancia -->
+          <ion-item-option
+            color="warning"
+            (click)="onEditConstancia(constancia)"
+          >
+            <ion-icon slot="icon-only" name="create"></ion-icon>
+          </ion-item-option>
+
           <!-- Ver detalles -->
           <ion-item-option
             color="primary"
@@ -129,6 +137,14 @@
             (click)="onGeneratePDF(constancia)"
           >
             <ion-icon slot="icon-only" name="document"></ion-icon>
+          </ion-item-option>
+
+          <!-- Eliminar constancia -->
+          <ion-item-option
+            color="danger"
+            (click)="onDeleteConstancia(constancia)"
+          >
+            <ion-icon slot="icon-only" name="trash"></ion-icon>
           </ion-item-option>
         </ion-item-options>
       </ion-item-sliding>

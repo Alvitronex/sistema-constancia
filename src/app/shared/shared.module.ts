@@ -8,6 +8,7 @@ import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { AddUpdateProductComponent } from './components/add-update-product/add-update-product.component';
 import { AddUpdateUserComponent } from './components/add-update-user/add-update-user.component';
 import { ConstanciaDetailComponent } from './components/constancia-detail/constancia-detail.component';
+import { EditConstanciaComponent } from './components/edit-constancia/edit-constancia.component';
 
 @NgModule({
   declarations: [
@@ -16,7 +17,8 @@ import { ConstanciaDetailComponent } from './components/constancia-detail/consta
     LogoComponent,
     AddUpdateProductComponent,
     AddUpdateUserComponent,
-    ConstanciaDetailComponent
+    ConstanciaDetailComponent,
+    EditConstanciaComponent
 
   ],
   exports: [

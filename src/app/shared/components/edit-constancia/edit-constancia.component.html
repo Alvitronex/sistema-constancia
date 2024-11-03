@@ -1,0 +1,61 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-title>Editar Constancia</ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="dismissModal()">
+        <ion-icon name="close"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+  <form [formGroup]="form" (ngSubmit)="onSubmit()" class="ion-padding">
+    <ion-item>
+      <ion-label position="floating">Nombres</ion-label>
+      <ion-input formControlName="nombre" type="text"></ion-input>
+      <ion-note slot="error" *ngIf="form.get('nombre').touched && form.get('nombre').errors">
+        {{ getErrorMessage('nombre') }}
+      </ion-note>
+    </ion-item>
+
+    <ion-item>
+      <ion-label position="floating">Apellidos</ion-label>
+      <ion-input formControlName="apellidos" type="text"></ion-input>
+      <ion-note slot="error" *ngIf="form.get('apellidos').touched && form.get('apellidos').errors">
+        {{ getErrorMessage('apellidos') }}
+      </ion-note>
+    </ion-item>
+
+    <ion-item>
+      <ion-label position="floating">Documento</ion-label>
+      <ion-input formControlName="documento" type="text"></ion-input>
+      <ion-note slot="error" *ngIf="form.get('documento').touched && form.get('documento').errors">
+        {{ getErrorMessage('documento') }}
+      </ion-note>
+    </ion-item>
+
+    <ion-item>
+      <ion-label position="floating">Tipo de Constancia</ion-label>
+      <ion-select formControlName="tipo">
+        <ion-select-option *ngFor="let tipo of tiposConstancia" [value]="tipo.value">
+          {{ tipo.label }}
+        </ion-select-option>
+      </ion-select>
+    </ion-item>
+
+    <ion-item>
+      <ion-label position="floating">Motivo</ion-label>
+      <ion-textarea formControlName="motivo" rows="4"></ion-textarea>
+      <ion-note slot="error" *ngIf="form.get('motivo').touched && form.get('motivo').errors">
+        {{ getErrorMessage('motivo') }}
+      </ion-note>
+    </ion-item>
+
+    <div class="ion-padding">
+      <ion-button expand="block" type="submit" [disabled]="!form.valid">
+        Actualizar Constancia
+      </ion-button>
+    </div>
+  </form>
+</ion-content>

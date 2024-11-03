@@ -9,6 +9,7 @@ import { orderBy } from '@angular/fire/firestore';
 import { groupBy } from 'lodash';
 import { ModalController } from '@ionic/angular';
 import { ConstanciaDetailComponent } from 'src/app/shared/components/constancia-detail/constancia-detail.component';
+import { EditConstanciaComponent } from 'src/app/shared/components/edit-constancia/edit-constancia.component';
 
 declare var pdfMake: any;
 
@@ -69,6 +70,15 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
     this.loadAvailableMonths();
   }
 
+  /*************  ✨ Codeium Command ⭐  *************/
+  /**
+   * ngOnDestroy
+   *
+   * Este método se llama automáticamente cuando el componente es destruido.
+   * Se utiliza para liberar recursos y cancelar suscripciones.
+   * En este caso, se utiliza para cancelar la suscripción a la lista de constancias.
+   */
+  /******  b60a140a-42fd-4e99-8dfc-9954bfc4cf89  *******/
   ngOnDestroy() {
     this.destroy$.next();
     this.destroy$.complete();
@@ -480,5 +490,65 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
       'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
     ];
     return meses[month - 1];
+  }
+  async onDeleteConstancia(constancia: Constancia) {
+    const alert = await this.utilsSvc.presentAlert({
+      header: 'Confirmar eliminación',
+      mode: 'ios',
+      message: '¿Está seguro de eliminar esta constancia? Esta acción no se puede deshacer.',
+      buttons: [
+        {
+          text: 'Cancelar',
+          role: 'cancel'
+        },
+        {
+          text: 'Eliminar',
+          role: 'destructive',
+          handler: async () => {
+            const loading = await this.utilsSvc.loading();
+            try {
+              await loading.present();
+              await this.firebaseSvc.deleteConstancia(constancia.id);
+
+              this.utilsSvc.presentToast({
+                message: 'Constancia eliminada correctamente',
+                color: 'success',
+                duration: 2500,
+                position: 'middle'
+              });
+              this.loadConstancias();
+            } catch (error) {
+              console.error('Error al eliminar constancia:', error);
+              this.utilsSvc.presentToast({
+                message: 'Error al eliminar la constancia',
+                color: 'danger',
+                duration: 2500,
+                position: 'middle'
+              });
+            } finally {
+              loading.dismiss();
+            }
+          }
+        }
+      ]
+    });
+  }
+
+  async onEditConstancia(constancia: Constancia) {
+    const modal = await this.modalController.create({
+      component: EditConstanciaComponent,
+      componentProps: {
+        constancia
+      },
+      cssClass: 'modal-full-right-side'
+    });
+
+    await modal.present();
+
+    const { data } = await modal.onWillDismiss();
+    if (data?.updated) {
+      // Recargar las constancias si se realizó una actualización
+      this.loadConstancias();
+    }
   }
 }
