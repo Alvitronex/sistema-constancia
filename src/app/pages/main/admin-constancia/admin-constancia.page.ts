@@ -10,6 +10,7 @@ import { groupBy } from 'lodash';
 import { ModalController } from '@ionic/angular';
 import { ConstanciaDetailComponent } from 'src/app/shared/components/constancia-detail/constancia-detail.component';
 import { EditConstanciaComponent } from 'src/app/shared/components/edit-constancia/edit-constancia.component';
+import { User } from 'src/app/models/user.models';
 
 declare var pdfMake: any;
 
@@ -70,15 +71,11 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
     this.loadAvailableMonths();
   }
 
-  /*************  ✨ Codeium Command ⭐  *************/
-  /**
-   * ngOnDestroy
-   *
-   * Este método se llama automáticamente cuando el componente es destruido.
-   * Se utiliza para liberar recursos y cancelar suscripciones.
-   * En este caso, se utiliza para cancelar la suscripción a la lista de constancias.
-   */
-  /******  b60a140a-42fd-4e99-8dfc-9954bfc4cf89  *******/
+
+  isAdmin(): boolean {
+    const user: User = this.utilsSvc.getFromLocalStorage('user');
+    return user?.role === 'admin';
+  }
   ngOnDestroy() {
     this.destroy$.next();
     this.destroy$.complete();
@@ -228,14 +225,24 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
   }
 
   async onUpdateStatus(constancia: Constancia, newStatus: string) {
+    // Si el estado es el mismo, no hacemos nada
+    if (constancia.estado === newStatus) return;
+
+    // Obtener la etiqueta del nuevo estado
+    const estadoLabel = this.estadosConstancia.find(e => e.value === newStatus)?.label || newStatus;
+
     const alert = await this.utilsSvc.presentAlert({
       header: 'Confirmar cambio',
       mode: 'ios',
-      message: `¿Está seguro de cambiar el estado a "${newStatus}"?`,
+      message: `¿Está seguro de cambiar el estado a "${estadoLabel}"?`,
       buttons: [
         {
           text: 'Cancelar',
-          role: 'cancel'
+          role: 'cancel',
+          handler: () => {
+            // Recargar las constancias para revertir el cambio visual
+            this.loadConstancias();
+          }
         },
         {
           text: 'Aceptar',
@@ -248,7 +255,7 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
               this.utilsSvc.presentToast({
                 message: 'Estado actualizado correctamente',
                 color: 'success',
-                duration: 2500,
+                duration: 1500,
                 position: 'middle'
               });
             } catch (error) {
@@ -256,9 +263,10 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
               this.utilsSvc.presentToast({
                 message: 'Error al actualizar el estado',
                 color: 'danger',
-                duration: 2500,
+                duration: 1500,
                 position: 'middle'
               });
+              this.loadConstancias();
             } finally {
               loading.dismiss();
             }
@@ -266,6 +274,7 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
         }
       ]
     });
+
   }
 
   async onGeneratePDF(constancia: Constancia) {
@@ -282,28 +291,72 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
     const loading = await this.utilsSvc.loading();
     try {
       await loading.present();
+
+      // Formatear la fecha actual
+      const fechaEmision = new Date().toLocaleDateString('es-ES', {
+        day: '2-digit',
+        month: 'long',
+        year: 'numeric'
+      });
+
       const docDefinition = {
+        pageSize: 'A4',
+        pageMargins: [40, 60, 40, 60],
         content: [
-          { text: 'CONSTANCIA', style: 'header' },
-          { text: '\n' },
-          { text: [{ text: '\nTipo de Constancia: ', bold: true }, constancia.tipo] },
-          { text: [{ text: '\nNombre Completo: ', bold: true }, `${constancia.nombre} ${constancia.apellidos}`] },
-          { text: [{ text: '\nDocumento: ', bold: true }, constancia.documento] },
-          { text: [{ text: '\nMotivo: ', bold: true }, constancia.motivo] },
-          { text: [{ text: '\nFecha de Emisión: ', bold: true }, new Date().toLocaleDateString()] }
+          {
+            text: 'CONSTANCIA',
+            style: 'header',
+            margin: [0, 0, 0, 20]
+          },
+          {
+            text: 'A QUIEN CORRESPONDA:',
+            style: 'subheader',
+            margin: [0, 20, 0, 20]
+          },
+          {
+            text: [
+              'Por medio de la presente se hace constar que ',
+              { text: `${constancia.nombre} ${constancia.apellidos}`, bold: true },
+              ', identificado(a) con documento número ',
+              { text: constancia.documento, bold: true },
+              ', solicita una constancia de tipo ',
+              { text: constancia.tipo.toLowerCase(), bold: true },
+              ' por el siguiente motivo:\n\n'
+            ],
+            margin: [0, 0, 0, 20]
+          },
+          {
+            text: constancia.motivo,
+            margin: [20, 0, 20, 20],
+            italics: true
+          },
+          {
+            text: `\nFecha de emisión: ${fechaEmision}`,
+            alignment: 'right',
+            margin: [0, 30, 0, 20]
+          },
+          {
+            text: '_______________________\nFirma Autorizada',
+            alignment: 'center',
+            margin: [0, 50, 0, 0]
+          }
         ],
         styles: {
           header: {
             fontSize: 22,
             bold: true,
-            alignment: 'center',
-            margin: [0, 0, 0, 20]
+            alignment: 'center'
+          },
+          subheader: {
+            fontSize: 14,
+            bold: true
           }
         }
       };
 
       this.utilsSvc.pdfMake();
-      pdfMake.createPdf(docDefinition).download(`constancia-${constancia.tipo}-${constancia.documento}.pdf`);
+
+      pdfMake.createPdf(docDefinition).open();  // Cambiamos a .open() directamente
 
       this.utilsSvc.presentToast({
         message: 'PDF generado correctamente',
@@ -322,6 +375,13 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
     } finally {
       loading.dismiss();
     }
+  }
+
+  // Método auxiliar para obtener el logo en base64
+  private async getBase64Logo(): Promise<string> {
+    // Aquí puedes retornar el base64 de tu logo
+    // Por ahora retornamos un placeholder
+    return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...'; // Agregar tu logo en base64
   }
   async generateMonthlyReport() {
     try {
@@ -492,6 +552,17 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
     return meses[month - 1];
   }
   async onDeleteConstancia(constancia: Constancia) {
+    // Verificar si el usuario es admin antes de proceder
+    if (!this.isAdmin()) {
+      this.utilsSvc.presentToast({
+        message: 'No tienes permisos para eliminar constancias',
+        color: 'warning',
+        duration: 2500,
+        position: 'middle'
+      });
+      return;
+    }
+
     const alert = await this.utilsSvc.presentAlert({
       header: 'Confirmar eliminación',
       mode: 'ios',
@@ -534,7 +605,19 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
     });
   }
 
+
   async onEditConstancia(constancia: Constancia) {
+    // Verificar si el usuario es admin antes de proceder
+    if (!this.isAdmin()) {
+      this.utilsSvc.presentToast({
+        message: 'No tienes permisos para editar constancias',
+        color: 'warning',
+        duration: 2500,
+        position: 'middle'
+      });
+      return;
+    }
+
     const modal = await this.modalController.create({
       component: EditConstanciaComponent,
       componentProps: {
