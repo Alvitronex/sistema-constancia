@@ -1,9 +1,5 @@
-import { Component, inject, Input, OnInit } from '@angular/core';
-import { FormControl, FormGroup, Validators } from '@angular/forms';
-import { Router } from '@angular/router';
-import { createUserWithEmailAndPassword, getAuth, updateProfile } from 'firebase/auth';
-import { doc, getFirestore, setDoc } from 'firebase/firestore';
-import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { Component, Input, OnInit } from '@angular/core';
+import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { User } from 'src/app/models/user.models';
 import { FirebaseService } from 'src/app/services/firebase.service';
 import { UtilsService } from 'src/app/services/utils.service';
@@ -15,179 +11,149 @@ import { UtilsService } from 'src/app/services/utils.service';
 })
 export class AddUpdateUserComponent implements OnInit {
   @Input() user: User;
+  form: FormGroup;
+  imageUrl: string = '';
 
-  form = new FormGroup({
-    uid: new FormControl(''),
-    email: new FormControl('', [Validators.required, Validators.email]),
-    password: new FormControl('', [Validators.required, Validators.minLength(6)]),
-    name: new FormControl('', [Validators.required, Validators.minLength(4)]),
-    image: new FormControl('')
-  });
+  roles = [
+    { id: 'usuario', name: 'Usuario' },
+    { id: 'planillero', name: 'Planillero' },
+    { id: 'admin', name: 'Administrador' }
+  ];
 
-  firebaseSvc = inject(FirebaseService);
-  utilsSvc = inject(UtilsService);
-  router = inject(Router);
-
-  selectedImage: File | null = null;
-  imagePreview: string | ArrayBuffer | null = null;
+  constructor(
+    private formBuilder: FormBuilder,
+    private firebaseSvc: FirebaseService,
+    public utilsSvc: UtilsService
+  ) { }
 
   ngOnInit() {
+    this.initForm();
     if (this.user) {
-      this.form.patchValue(this.user);
-      this.form.controls.password.clearValidators();
-      this.imagePreview = this.user.image || null;
+      this.imageUrl = this.user.image || '';
+    }
+  }
+
+  // Verifica si el usuario que se está editando es el usuario actual
+  isCurrentUser(): boolean {
+    const currentUser = this.utilsSvc.getFromLocalStorage('user');
+    return currentUser && currentUser.uid === this.user?.uid;
+  }
+
+  initForm() {
+    this.form = this.formBuilder.group({
+      uid: [this.user?.uid || ''],
+      email: [this.user?.email || '', [Validators.required, Validators.email]],
+      password: ['', this.user ? [] : [Validators.required]], // Solo requerido para nuevos usuarios
+      name: [this.user?.name || '', [Validators.required, Validators.minLength(4)]],
+      role: [this.user?.role || '', [Validators.required]],
+      image: [this.user?.image || '']
+    });
+
+    // Deshabilitar email si estamos editando
+    if (this.user) {
+      this.form.get('email').disable();
+    }
+  }
+
+  // Método para tomar/seleccionar imagen
+  async takeImage() {
+    try {
+      const dataUrl = (await this.utilsSvc.takePicture('Imagen de Usuario')).dataUrl;
+      this.imageUrl = dataUrl;
+      this.form.patchValue({ image: dataUrl });
+    } catch (error) {
+      console.error('Error al seleccionar imagen:', error);
+      this.utilsSvc.presentToast({
+        message: 'Error al seleccionar la imagen',
+        duration: 2500,
+        color: 'danger',
+        position: 'middle'
+      });
     }
   }
 
   async submit() {
     if (this.form.valid) {
-      if (this.user) this.updateUser();
-      else this.createUser();
-    }
-  }
-
-  async createUser() {
-    const loading = await this.utilsSvc.loading();
-    await loading.present();
-
-    try {
-      const auth = getAuth();
-      const userCredential = await createUserWithEmailAndPassword(auth, this.form.value.email, this.form.value.password);
-      const newUser = userCredential.user;
-
-      let imageUrl = '';
-      if (this.selectedImage) {
-        imageUrl = await this.uploadImage(newUser.uid);
-      }
-
-      await updateProfile(newUser, { displayName: this.form.value.name, photoURL: imageUrl });
-
-      this.form.controls.uid.setValue(newUser.uid);
-
-      await this.setUserInfo(newUser.uid, imageUrl);
-
-      this.utilsSvc.dismissModal({ success: true });
-
-      this.utilsSvc.presentToast({
-        message: 'Usuario creado exitosamente',
-        duration: 2500,
-        color: 'success',
-        position: 'middle',
-        icon: 'checkmark-circle-outline'
-      });
-
-      this.router.navigate(['/panel']);
-    } catch (error) {
-      console.error(error);
-      this.utilsSvc.presentToast({
-        message: error.message,
-        duration: 2500,
-        color: 'danger',
-        position: 'middle',
-        icon: 'alert-circle-outline'
-      });
-    } finally {
-      loading.dismiss();
-    }
-  }
-
-  async updateUser() {
-    const loading = await this.utilsSvc.loading();
-    await loading.present();
-
-    try {
-      const auth = getAuth();
-      const user = auth.currentUser;
-
-      if (user) {
-        let imageUrl = this.user.image || '';
-        if (this.selectedImage) {
-          imageUrl = await this.uploadImage(user.uid);
-        }
-
-        const updateData: any = { displayName: this.form.value.name };
-        if (imageUrl) {
-          updateData.photoURL = imageUrl;
-        }
-
-        await updateProfile(user, updateData);
-        await this.setUserInfo(user.uid, imageUrl);
-
-        this.utilsSvc.dismissModal({ success: true });
-
-        this.utilsSvc.presentToast({
-          message: 'Usuario actualizado exitosamente',
-          duration: 2500,
-          color: 'success',
-          position: 'middle',
-          icon: 'checkmark-circle-outline'
-        });
-
-        this.router.navigate(['/panel']);
-      }
-    } catch (error) {
-      console.error(error);
-      this.utilsSvc.presentToast({
-        message: error.message,
-        duration: 2500,
-        color: 'danger',
-        position: 'middle',
-        icon: 'alert-circle-outline'
-      });
-    } finally {
-      loading.dismiss();
-    }
-  }
-
-  async setUserInfo(uid: string, imageUrl: string) {
-    if (this.form.valid) {
-      const db = getFirestore();
-      const userDocRef = doc(db, `users/${uid}`);
-
-      const userData: any = {
-        uid: uid,
-        email: this.form.value.email,
-        name: this.form.value.name,
-      };
-
-      if (imageUrl) {
-        userData.image = imageUrl;
-      }
-
+      const loading = await this.utilsSvc.loading();
       try {
-        await setDoc(userDocRef, userData, { merge: true });
+        await loading.present();
+
+        let userData = { ...this.form.value };
+
+        // Si hay una nueva imagen, subirla primero
+        if (this.imageUrl && this.imageUrl !== this.user?.image) {
+          const imagePath = `users/${userData.uid || 'temp'}/profile`;
+          userData.image = await this.firebaseSvc.uploadImage(imagePath, this.imageUrl);
+        }
+
+        if (this.user) {
+          // Actualizar usuario existente
+          const path = `users/${this.user.uid}`;
+          delete userData.password;
+          delete userData.email;
+
+          await this.firebaseSvc.updateDocument(path, userData);
+
+          // Si es el usuario actual, actualizar localStorage
+          if (this.isCurrentUser()) {
+            this.utilsSvc.updateCurrentUser(userData);
+          }
+
+          this.utilsSvc.dismissModal({ success: true });
+
+          this.utilsSvc.presentToast({
+            message: 'Usuario actualizado exitosamente',
+            duration: 1500,
+            color: 'success',
+            position: 'middle'
+          });
+        } else {
+          // Crear nuevo usuario
+          const res = await this.firebaseSvc.signUp(userData as User);
+          await this.firebaseSvc.updateUser(userData.name);
+
+          userData.uid = res.user.uid;
+          const path = `users/${userData.uid}`;
+          delete userData.password;
+
+          await this.firebaseSvc.setDocument(path, userData);
+          this.utilsSvc.dismissModal({ success: true });
+
+          this.utilsSvc.presentToast({
+            message: 'Usuario creado exitosamente',
+            duration: 1500,
+            color: 'success',
+            position: 'middle'
+          });
+        }
+
       } catch (error) {
-        console.error("Error adding document: ", error);
-        throw error;
+        console.error('Error:', error);
+        this.utilsSvc.presentToast({
+          message: error.message,
+          duration: 2500,
+          color: 'danger',
+          position: 'middle'
+        });
+      } finally {
+        loading.dismiss();
       }
     }
   }
+  // Helper para mensajes de error
+  getErrorMessage(controlName: string): string {
+    const control = this.form.get(controlName);
 
-  async uploadImage(uid: string): Promise<string> {
-    if (!this.selectedImage) return '';
+    if (!control || !control.errors || !control.touched) return '';
 
-    const storage = getStorage();
-    const storageRef = ref(storage, `user-images/${uid}/${Date.now()}_${this.selectedImage.name}`);
+    const errors = control.errors;
 
-    try {
-      const snapshot = await uploadBytes(storageRef, this.selectedImage);
-      const downloadURL = await getDownloadURL(snapshot.ref);
-      return downloadURL;
-    } catch (error) {
-      console.error("Error uploading image: ", error);
-      throw error;
+    if (errors['required']) return 'Este campo es requerido';
+    if (errors['email']) return 'Correo electrónico inválido';
+    if (errors['minlength']) {
+      return `Mínimo ${errors['minlength'].requiredLength} caracteres`;
     }
-  }
 
-  onImageSelected(event: Event) {
-    const file = (event.target as HTMLInputElement).files?.[0];
-    if (file) {
-      this.selectedImage = file;
-      const reader = new FileReader();
-      reader.onload = () => {
-        this.imagePreview = reader.result;
-      };
-      reader.readAsDataURL(file);
-    }
+    return '';
   }
 }

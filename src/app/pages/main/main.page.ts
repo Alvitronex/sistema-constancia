@@ -40,10 +40,22 @@ export class MainPage implements OnInit {
   firebaseSvc = inject(FirebaseService);
   utilsSvc = inject(UtilsService);
   currentPath: string = '';
+  currentUser: User;
 
   ngOnInit() {
     this.router.events.subscribe((event: any) => {
       if (event?.url) this.currentPath = event.url;
+    });
+
+
+    // Inicializar usuario actual
+    this.currentUser = this.utilsSvc.getFromLocalStorage('user');
+
+    // Escuchar cambios en el localStorage
+    window.addEventListener('storage', (e) => {
+      if (e.key === 'user') {
+        this.currentUser = JSON.parse(e.newValue);
+      }
     });
   }
   // Obtener las páginas según el rol del usuario
@@ -59,10 +71,12 @@ export class MainPage implements OnInit {
     }
   }
 
+  // Modificar el método user() para usar la propiedad currentUser
   user(): User {
-    return this.utilsSvc.getFromLocalStorage('user');
+    // Actualizar currentUser desde localStorage
+    this.currentUser = this.utilsSvc.getFromLocalStorage('user');
+    return this.currentUser;
   }
-
   // Obtener el rol para mostrar
   getRoleDisplay(): string {
     const role = this.user()?.role;

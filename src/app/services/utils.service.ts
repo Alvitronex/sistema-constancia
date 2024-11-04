@@ -4,6 +4,7 @@ import { AlertController, AlertOptions, LoadingController, ModalController, Moda
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import * as pdfMake from 'pdfmake/build/pdfmake';
 import * as pdfFonts from 'pdfmake/build/vfs_fonts';
+import { User } from '../models/user.models';
 @Injectable({
   providedIn: 'root'
 })
@@ -73,7 +74,17 @@ async presentAlert(opts?: AlertOptions) {
     const { data } = await modal.onWillDismiss();
     if(data) return data;
   }
+// utils.service.ts
 
+updateCurrentUser(userData: Partial<User>) {
+  const currentUser = this.getFromLocalStorage('user');
+  if (currentUser) {
+    const updatedUser = { ...currentUser, ...userData };
+    this.saveInLocalStorage('user', updatedUser);
+    // Disparar un evento personalizado para notificar cambios
+    window.dispatchEvent(new Event('userUpdated'));
+  }
+}
   dismissModal(data?: any) {
     return this.modaCtrl.dismiss(data);
   }

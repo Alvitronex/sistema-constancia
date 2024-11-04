@@ -1,80 +1,165 @@
-<app-header [showMenu]="true" title="Panel de Usuarios"></app-header>
+<ion-header >
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-menu-button></ion-menu-button>
+    </ion-buttons>
+    <ion-title>Panel de Usuarios</ion-title>
+  </ion-toolbar>
+</ion-header>
 
 <ion-content>
-  <ion-refresher slot="fixed" (ionRefresh)="doRefresh($event)">
-    <ion-refresher-content></ion-refresher-content>
-  </ion-refresher>
+  <!-- Contenedor de Filtros -->
+  <div class="filters-container ion-padding">
+    <ion-grid>
+      <ion-row>
+        <!-- Búsqueda -->
+        <ion-col size="12" size-md="4">
+          <ion-item lines="none">
+            <ion-icon slot="start" name="search-outline"></ion-icon>
+            <ion-input
+              [formControl]="searchControl"
+              type="text"
+              placeholder="Buscar usuarios..."
+            >
+            </ion-input>
+          </ion-item>
+        </ion-col>
 
-  <!-- ======= Usuarios ======= -->
-  <ion-list *ngIf="users.length > 0">
-    <ion-item-sliding class="user-item" *ngFor="let user of displayedUsers">
-      <ion-item>
-        <ion-avatar slot="start">
-          <img [src]="user.image || 'assets/default-avatar.png'" />
-        </ion-avatar>
-        <ion-label>
-          <h2>{{user.name}}</h2>
-          <p>{{user.email}}</p>
-        </ion-label>
-      </ion-item>
-      <ion-item-options side="end">
-        <ion-item-option (click)="addUpdateUser(user)" color="primary">
-          <ion-icon slot="icon-only" name="create-outline"></ion-icon>
-        </ion-item-option>
-        <!-- <ion-item-option (click)="confirmDeleteUser(user)" color="danger">
-          <ion-icon slot="icon-only" name="trash-outline"></ion-icon>
-        </ion-item-option> -->
-      </ion-item-options>
-    </ion-item-sliding>
-  </ion-list>
+        <!-- Filtro de Rol -->
+        <ion-col size="12" size-md="3">
+          <ion-item lines="none">
+            <ion-icon slot="start" name="filter-outline"></ion-icon>
+            <ion-select
+              [formControl]="roleControl"
+              interface="popover"
+              placeholder="Rol"
+            >
+              <ion-select-option value="todos">Todos</ion-select-option>
+              <ion-select-option value="admin">Administrador</ion-select-option>
+              <ion-select-option value="planillero"
+                >Planillero</ion-select-option
+              >
+              <ion-select-option value="usuario">Usuario</ion-select-option>
+            </ion-select>
+          </ion-item>
+        </ion-col>
 
-  <!-- ======= Paginador ======= -->
-  <ion-grid *ngIf="users.length > 0">
-    <ion-row class="ion-justify-content-center">
-      <ion-col size="auto">
-        <ion-button
-          fill="clear"
-          (click)="prevPage()"
-          [disabled]="currentPage === 1"
-        >
-          <ion-icon name="chevron-back-outline"></ion-icon>
-        </ion-button>
-      </ion-col>
-      <ion-col size="auto" *ngFor="let page of pages">
-        <ion-button
-          fill="clear"
-          [color]="page === currentPage ? 'primary' : 'medium'"
-          (click)="goToPage(page)"
-        >
-          {{ page }}
-        </ion-button>
-      </ion-col>
-      <ion-col size="auto">
-        <ion-button
-          fill="clear"
-          (click)="nextPage()"
-          [disabled]="currentPage === totalPages"
-        >
-          <ion-icon name="chevron-forward-outline"></ion-icon>
-        </ion-button>
-      </ion-col>
-    </ion-row>
-  </ion-grid>
+        <!-- Botones de Acción -->
+        <ion-col size="12" size-md="5" class="ion-text-end">
+          <ion-button (click)="clearFilters()" fill="clear" color="medium">
+            <ion-icon slot="start" name="trash-outline"></ion-icon>
+            Limpiar filtros
+          </ion-button>
+          <ion-button (click)="addUpdateUser()" color="primary">
+            <ion-icon slot="start" name="add-outline"></ion-icon>
+            Nuevo Usuario
+          </ion-button>
+        </ion-col>
+      </ion-row>
+    </ion-grid>
+  </div>
 
-  <!-- ======= Sin Usuarios disponibles======= -->
-  <div *ngIf="!loading && !users.length" class="empty">
-    <ion-icon name="people-outline"></ion-icon>
+  <!-- Lista de Usuarios -->
+  <div
+    class="users-list ion-padding"
+    *ngIf="(filteredUsers$ | async)?.length > 0"
+  >
+    <ion-card *ngFor="let user of paginatedUsers">
+      <ion-card-content>
+        <ion-grid>
+          <ion-row class="ion-align-items-center">
+            <!-- Info del Usuario -->
+            <ion-col size="12" size-md="3">
+              <h2>{{ user.name }}</h2>
+              <p>
+                <ion-icon name="mail-outline"></ion-icon>
+                {{ user.email }}
+              </p>
+            </ion-col>
+
+            <!-- Avatar -->
+            <ion-col size="12" size-md="2" class="ion-text-center">
+              <ion-avatar>
+                <img
+                  [src]="user.image || '/assets/no-image.png'"
+                  alt="user avatar"
+                />
+              </ion-avatar>
+            </ion-col>
+
+            <!-- Rol -->
+            <ion-col size="12" size-md="3" class="ion-text-center">
+              <ion-badge [color]="getRoleColor(user.role)">
+                {{ getRoleDisplay(user.role) }}
+              </ion-badge>
+            </ion-col>
+
+            <!-- Acciones -->
+            <ion-col size="12" size-md="4" class="ion-text-end action-buttons">
+              <ion-button
+                (click)="onDeleteUser(user)"
+                color="danger"
+                fill="clear"
+              >
+                <ion-icon slot="icon-only" name="trash-outline"></ion-icon>
+              </ion-button>
+              <ion-button
+                (click)="addUpdateUser(user)"
+                color="primary"
+                fill="clear"
+              >
+                <ion-icon slot="icon-only" name="create-outline"></ion-icon>
+              </ion-button>
+            </ion-col>
+          </ion-row>
+        </ion-grid>
+      </ion-card-content>
+    </ion-card>
+  </div>
+
+  <!-- Estado Vacío -->
+  <div
+    class="empty-state"
+    *ngIf="!loading && (filteredUsers$ | async)?.length === 0"
+  >
+    <ion-icon name="people-outline" class="empty-icon"></ion-icon>
     <h3>No hay usuarios disponibles</h3>
+    <p>No se encontraron usuarios con los filtros actuales</p>
   </div>
 
-  <!-- ======= Loader ======= -->
-  <div *ngIf="loading" class="ion-text-center">
-    <ion-spinner name="crescent"></ion-spinner>
+  <!-- Paginación -->
+  <div
+    class="pagination-container ion-text-center ion-margin-vertical"
+    *ngIf="(filteredUsers$ | async)?.length > 0"
+  >
+    <ion-button
+      fill="clear"
+      [disabled]="currentPage === 1"
+      (click)="prevPage()"
+    >
+      <ion-icon slot="icon-only" name="chevron-back-outline"></ion-icon>
+    </ion-button>
+
+    <ion-button
+      fill="clear"
+      [color]="page === currentPage ? 'primary' : 'medium'"
+      *ngFor="let page of pages"
+      (click)="goToPage(page)"
+    >
+      {{page}}
+    </ion-button>
+
+    <ion-button
+      fill="clear"
+      [disabled]="currentPage === totalPages"
+      (click)="nextPage()"
+    >
+      <ion-icon slot="icon-only" name="chevron-forward-outline"></ion-icon>
+    </ion-button>
   </div>
 
-  <ion-fab vertical="bottom" horizontal="end" slot="fixed" style="right: 25px">
-    <ion-fab-button (click)="addUpdateUser()">
-      <ion-icon name="add"></ion-icon>
-    </ion-fab-button>
-  </ion-fab>
+  <!-- Loading Spinner -->
+  <div class="ion-text-center" *ngIf="loading">
+    <ion-spinner></ion-spinner>
+  </div>
 </ion-content>
