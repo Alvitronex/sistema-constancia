@@ -1,6 +1,6 @@
 import { inject, Injectable } from '@angular/core';
 import { AngularFireAuth } from '@angular/fire/compat/auth';
-import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, sendPasswordResetEmail } from 'firebase/auth';
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, sendPasswordResetEmail, updateEmail as firebaseUpdateEmail, reauthenticateWithCredential, EmailAuthProvider, AuthErrorCodes, updateEmail } from 'firebase/auth';
 import { User } from '../models/user.models';
 import { AngularFirestore } from '@angular/fire/compat/firestore';
 import { getFirestore, setDoc, doc, getDoc, addDoc, collection, collectionData, query, updateDoc, deleteDoc, where, orderBy } from '@angular/fire/firestore';
@@ -9,6 +9,9 @@ import { AngularFireStorage } from '@angular/fire/compat/storage';
 import { getStorage, uploadBytes, ref, getDownloadURL, uploadString, deleteObject } from 'firebase/storage';
 import { Constancia } from '../models/constancia.model';
 import { Observable } from 'rxjs';
+import firebase from 'firebase/compat/app';
+import 'firebase/compat/auth';
+
 
 @Injectable({
   providedIn: 'root'
@@ -104,7 +107,114 @@ export class FirebaseService {
   deleteFile(path: string) {
     return + deleteObject(ref(getStorage(), path));
   }
+  // ======= Autenticación y Email =======
+  async reauthenticateUser(email: string, password: string): Promise<boolean> {
+    try {
+      const currentUser = await this.auth.currentUser;
+      if (!currentUser) {
+        throw new Error('No hay usuario autenticado');
+      }
 
+      const credentials = firebase.auth.EmailAuthProvider.credential(
+        email,
+        password
+      );
+
+      await currentUser.reauthenticateWithCredential(credentials);
+      return true;
+    } catch (error) {
+      console.error('Error en reautenticación:', error);
+      throw error;
+    }
+  }
+
+
+
+  async reauthenticateAndUpdateEmail(currentEmail: string, password: string, newEmail: string): Promise<void> {
+    try {
+      const user = await this.auth.currentUser;
+      if (!user) {
+        throw new Error('No hay usuario autenticado');
+      }
+
+      // Crear credenciales usando la API de Firebase Compat
+      const credential = await firebase.auth.EmailAuthProvider.credential(
+        currentEmail,
+        password
+      );
+
+      // Primero reautenticar
+      try {
+        await user.reauthenticateWithCredential(credential);
+      } catch (error: any) {
+        console.error('Error en reautenticación:', error);
+        if (error.code === 'auth/wrong-password') {
+          throw new Error('La contraseña ingresada es incorrecta');
+        } else if (error.code === 'auth/invalid-credential') {
+          // Intentar reautenticar de otra manera
+          await this.auth.signInWithEmailAndPassword(currentEmail, password);
+        } else {
+          throw error;
+        }
+      }
+
+      // Verificar el nuevo email
+      const methods = await this.auth.fetchSignInMethodsForEmail(newEmail);
+      if (methods.length > 0) {
+        throw new Error('El correo electrónico ya está en uso');
+      }
+
+      // Actualizar el email
+      await user.updateEmail(newEmail);
+
+      return;
+    } catch (error: any) {
+      console.error('Error en el proceso:', error);
+      if (error.code === 'auth/email-already-in-use') {
+        throw new Error('El correo electrónico ya está en uso');
+      } else if (error.code === 'auth/invalid-email') {
+        throw new Error('El correo electrónico no es válido');
+      } else if (error.code === 'auth/requires-recent-login') {
+        throw new Error('Por favor, vuelve a iniciar sesión');
+      } else if (error.message) {
+        throw new Error(error.message);
+      }
+      throw new Error('Error al actualizar el email');
+    }
+  }
+
+  // Método auxiliar para verificar la sesión actual
+  async verifyCurrentSession(email: string, password: string): Promise<boolean> {
+    try {
+      await this.auth.signInWithEmailAndPassword(email, password);
+      return true;
+    } catch (error) {
+      console.error('Error al verificar sesión:', error);
+      return false;
+    }
+  }
+  async updateUserEmail(newEmail: string): Promise<void> {
+    try {
+      const currentUser = await this.auth.currentUser;
+      if (!currentUser) {
+        throw new Error('No hay usuario autenticado');
+      }
+      await currentUser.updateEmail(newEmail);
+    } catch (error) {
+      console.error('Error al actualizar email:', error);
+      throw error;
+    }
+  }
+
+  async checkEmailExists(email: string): Promise<boolean> {
+    try {
+      const methods = await this.auth.fetchSignInMethodsForEmail(email);
+      return methods.length > 0;
+    } catch (error) {
+      console.error('Error al verificar email:', error);
+      throw new Error('Error al verificar disponibilidad del correo electrónico');
+    }
+  }
   // ====================== Constancias ======================
 
   // ======= Crear constancia =========
@@ -161,5 +271,5 @@ export class FirebaseService {
       throw error;
     }
   }
-  
+
 }
