@@ -9,6 +9,7 @@ import { AddUpdateProductComponent } from './components/add-update-product/add-u
 import { AddUpdateUserComponent } from './components/add-update-user/add-update-user.component';
 import { ConstanciaDetailComponent } from './components/constancia-detail/constancia-detail.component';
 import { EditConstanciaComponent } from './components/edit-constancia/edit-constancia.component';
+import { CreateConstanciaComponent } from './components/create-constancia/create-constancia.component';
 
 @NgModule({
   declarations: [
@@ -18,7 +19,8 @@ import { EditConstanciaComponent } from './components/edit-constancia/edit-const
     AddUpdateProductComponent,
     AddUpdateUserComponent,
     ConstanciaDetailComponent,
-    EditConstanciaComponent
+    EditConstanciaComponent,
+    CreateConstanciaComponent
 
   ],
   exports: [
@@ -27,7 +29,8 @@ import { EditConstanciaComponent } from './components/edit-constancia/edit-const
     LogoComponent,
     ReactiveFormsModule,
     AddUpdateProductComponent,
-    ConstanciaDetailComponent
+    ConstanciaDetailComponent,
+    CreateConstanciaComponent
   ],
   imports: [
     CommonModule,

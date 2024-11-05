@@ -1,0 +1,64 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-button color="primary" (click)="dismissModal()">
+        <ion-icon slot="icon-only" name="arrow-back"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+    <ion-title>Nueva Constancia</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <form [formGroup]="form" (ngSubmit)="onSubmit()">
+    <ion-item>
+      <ion-label position="floating">Nombres</ion-label>
+      <ion-input formControlName="nombre" type="text"></ion-input>
+      <ion-note color="danger" *ngIf="getErrorMessage('nombre')">
+        {{ getErrorMessage('nombre') }}
+      </ion-note>
+    </ion-item>
+
+    <ion-item>
+      <ion-label position="floating">Apellidos</ion-label>
+      <ion-input formControlName="apellidos" type="text"></ion-input>
+      <ion-note color="danger" *ngIf="getErrorMessage('apellidos')">
+        {{ getErrorMessage('apellidos') }}
+      </ion-note>
+    </ion-item>
+
+    <ion-item>
+      <ion-label position="floating">Documento</ion-label>
+      <ion-input formControlName="documento" type="text"></ion-input>
+      <ion-note color="danger" *ngIf="getErrorMessage('documento')">
+        {{ getErrorMessage('documento') }}
+      </ion-note>
+    </ion-item>
+
+    <ion-item>
+      <ion-label position="floating">Tipo de Constancia</ion-label>
+      <ion-select formControlName="tipo">
+        <ion-select-option *ngFor="let tipo of tiposConstancia" [value]="tipo.value">
+          {{ tipo.label }}
+        </ion-select-option>
+      </ion-select>
+      <ion-note color="danger" *ngIf="getErrorMessage('tipo')">
+        {{ getErrorMessage('tipo') }}
+      </ion-note>
+    </ion-item>
+
+    <ion-item>
+      <ion-label position="floating">Motivo</ion-label>
+      <ion-textarea formControlName="motivo" rows="4"></ion-textarea>
+      <ion-note color="danger" *ngIf="getErrorMessage('motivo')">
+        {{ getErrorMessage('motivo') }}
+      </ion-note>
+    </ion-item>
+
+    <div class="ion-padding">
+      <ion-button expand="block" type="submit" [disabled]="!form.valid">
+        Crear Constancia
+      </ion-button>
+    </div>
+  </form>
+</ion-content>
