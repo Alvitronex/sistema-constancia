@@ -49,7 +49,7 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
   // Estados de constancias disponibles
   estadosConstancia = [
     { value: 'pendiente', label: 'Pendiente', color: 'warning' },
-    { value: 'aprobada', label: 'Aprobada', color: 'success' },
+    { value: 'aprobada', laabel: 'Aprobada', color: 'success' },
     { value: 'rechazada', label: 'Rechazada', color: 'danger' }
   ];
 

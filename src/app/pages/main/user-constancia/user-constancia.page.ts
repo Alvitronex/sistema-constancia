@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, AfterViewInit } from '@angular/core';
 import { FormControl } from '@angular/forms';
 import { Observable, Subject, combineLatest, of } from 'rxjs';
 import { takeUntil, debounceTime, map, startWith, take } from 'rxjs/operators';
@@ -10,13 +10,14 @@ import { ModalController } from '@ionic/angular';
 import { ConstanciaDetailComponent } from 'src/app/shared/components/constancia-detail/constancia-detail.component';
 import { CreateConstanciaComponent } from 'src/app/shared/components/create-constancia/create-constancia.component';
 import * as pdfMake from 'pdfmake/build/pdfmake';
+import { User } from 'src/app/models/user.models';
 
 @Component({
   selector: 'app-user-constancia',
   templateUrl: './user-constancia.page.html',
   styleUrls: ['./user-constancia.page.scss'],
 })
-export class UserConstanciaPage implements OnInit, OnDestroy {
+export class UserConstanciaPage implements OnInit, OnDestroy, AfterViewInit {
   constancias$: Observable<Constancia[]>;
   filteredConstancias$: Observable<Constancia[]>;
   loading = true;
@@ -32,6 +33,7 @@ export class UserConstanciaPage implements OnInit, OnDestroy {
   pages: number[] = [];
   Math = Math;
   private allConstancias: Constancia[] = [];
+  constancias: Constancia[] = [];
 
   // Tipos de constancias disponibles
   tiposConstancia = [
@@ -56,13 +58,10 @@ export class UserConstanciaPage implements OnInit, OnDestroy {
   ) { }
 
   ngOnInit() {
-    this.loadConstancias();
+    this.getConstancias();
   }
 
-  ngOnDestroy() {
-    this.destroy$.next();
-    this.destroy$.complete();
-  }
+
 
   private filterConstancias(
     constancias: Constancia[],
@@ -89,47 +88,7 @@ export class UserConstanciaPage implements OnInit, OnDestroy {
     });
   }
 
-  private loadConstancias() {
-    try {
-      this.loading = true;
-      this.error = false;
-  
-      const constanciasRef = this.firebaseSvc.getCollectionData(
-        'constancias',
-        [orderBy('createdAt', 'desc')]
-      ) as Observable<Constancia[]>;
-  
-      this.filteredConstancias$ = combineLatest([
-        constanciasRef,
-        this.searchControl.valueChanges.pipe(startWith('')),
-        this.tipoControl.valueChanges.pipe(startWith('todos')),
-        this.estadoControl.valueChanges.pipe(startWith('todos'))
-      ]).pipe(
-        debounceTime(300),
-        map(([constancias, searchTerm, tipo, estado]) => {
-          this.allConstancias = constancias;
-          const filtered = this.filterConstancias(constancias, searchTerm, tipo, estado);
-          this.totalPages = Math.ceil(filtered.length / this.pageSize);
-  
-          if (this.currentPage > this.totalPages) {
-            this.currentPage = 1;
-          }
-  
-          this.updatePaginatedConstancias(filtered);
-          this.updatePagination();
-          this.loading = false;
-          return filtered;
-        }),
-        takeUntil(this.destroy$)
-      );
-  
-      this.filteredConstancias$.subscribe();
-    } catch (error) {
-      console.error('Error in loadConstancias:', error);
-      this.error = true;
-      this.loading = false;
-    }
-  }
+
   async openConstanciaDetail(constancia: Constancia) {
     const modal = await this.modalController.create({
       component: ConstanciaDetailComponent,
@@ -138,19 +97,6 @@ export class UserConstanciaPage implements OnInit, OnDestroy {
     return await modal.present();
   }
 
-  async createConstancia() {
-    const modal = await this.modalController.create({
-      component: CreateConstanciaComponent,
-      cssClass: 'modal-full-right-side'
-    });
-
-    await modal.present();
-
-    const { data } = await modal.onWillDismiss();
-    if (data?.created) {
-      this.loadConstancias();
-    }
-  }
 
   async generatePDF(constancia: Constancia) {
     if (constancia.estado !== 'aprobada') {
@@ -296,4 +242,122 @@ export class UserConstanciaPage implements OnInit, OnDestroy {
   get hasConstancias(): boolean {
     return this.allConstancias.length > 0;
   }
+  private getCurrentUser(): User {
+    return this.utilsSvc.getFromLocalStorage('user');
+  }
+
+
+
+
+
+  /* nuevo codigo */
+  // === Obtener usuario ===
+  user(): User {
+    return this.utilsSvc.getFromLocalStorage('user');
+  }
+
+
+  // === Cargar vista ===
+  ionViewWillEnter() {
+    this.getConstancias();
+  }
+
+  // === Refrescar ===
+  doRefresh(event) {
+    setTimeout(() => {
+      this.getConstancias();
+      event.target.complete();
+    }, 1000);
+  }
+
+  // === Obtener Constancias ===
+  getConstancias() {
+    this.loading = true;
+    let path = `users/${this.user().uid}/constancia`;
+
+    let query = [orderBy('createdAt', 'desc')];
+
+    this.firebaseSvc.getCollectionData(path, query).subscribe({
+      next: (res: any) => {
+        this.constancias = res;
+        this.applyFilters();
+        this.loading = false;
+      },
+      error: (error) => {
+        console.error('Error in getConstancias:', error);
+        this.error = true;
+        this.loading = false;
+      }
+    });
+  }
+
+  // === Aplicar Filtros ===
+  private applyFilters() {
+    const searchTerm = this.searchControl.value || '';
+    const tipo = this.tipoControl.value || 'todos';
+    const estado = this.estadoControl.value || 'todos';
+
+    const filtered = this.filterConstancias(
+      this.constancias,
+      searchTerm,
+      tipo,
+      estado
+    );
+
+    this.totalPages = Math.ceil(filtered.length / this.pageSize);
+    if (this.currentPage > this.totalPages) {
+      this.currentPage = 1;
+    }
+
+    this.updatePaginatedConstancias(filtered);
+    this.updatePagination();
+  }
+
+  // ====== Crear constancia =========
+  async addConstancia() {
+    let success = await this.utilsSvc.presentModal({
+      component: CreateConstanciaComponent,
+      cssClass: 'modal-full-right-side'
+    });
+
+    if (success) this.getConstancias();
+  }
+
+  // ... resto de los métodos de paginación y filtrado ...
+  // === Crear constancia ===
+  async createConstancia() {
+    const path = `users/${this.user().uid}/constancia`;
+
+    const modal = await this.modalController.create({
+      component: CreateConstanciaComponent,
+      componentProps: { path }, // Pasamos el path al componente
+      cssClass: 'modal-full-right-side'
+    });
+
+    await modal.present();
+
+    const { data } = await modal.onWillDismiss();
+    if (data?.created) {
+      this.getConstancias();
+    }
+  }
+  // === Rastrear cambios en los filtros ===
+  ngAfterViewInit() {
+    combineLatest([
+      this.searchControl.valueChanges.pipe(startWith('')),
+      this.tipoControl.valueChanges.pipe(startWith('todos')),
+      this.estadoControl.valueChanges.pipe(startWith('todos'))
+    ]).pipe(
+      debounceTime(300),
+      takeUntil(this.destroy$)
+    ).subscribe(() => {
+      this.applyFilters();
+    });
+  }
+
+  ngOnDestroy() {
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
+
 }
