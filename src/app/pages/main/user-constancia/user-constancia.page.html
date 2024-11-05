@@ -13,8 +13,8 @@
     <!-- Título y botón nueva constancia -->
     <div class="header-section">
       <h1>Historial de Constancias</h1>
-      <ion-button class="nueva-constancia">
-        <ion-icon name="add-outline" (click)="createConstancia()"></ion-icon>
+      <ion-button class="nueva-constancia" (click)="createConstancia()">
+        <ion-icon name="add-outline"></ion-icon>
         Nueva Constancia
       </ion-button>
     </div>
@@ -24,7 +24,6 @@
       <div class="select-container">
         <label class="filter-label">Tipo</label>
         <ion-select [formControl]="tipoControl" interface="popover">
-          <ion-select-option value="todos">Todos</ion-select-option>
           <ion-select-option
             *ngFor="let tipo of tiposConstancia"
             [value]="tipo.value"
@@ -37,7 +36,6 @@
       <div class="select-container">
         <label class="filter-label">Estado</label>
         <ion-select [formControl]="estadoControl" interface="popover">
-          <ion-select-option value="todos">Todos</ion-select-option>
           <ion-select-option
             *ngFor="let estado of estadosConstancia"
             [value]="estado.value"
@@ -63,11 +61,11 @@
     </div>
 
     <!-- Lista de Constancias -->
-    <div
-      class="constancias-container"
-      *ngIf="(filteredConstancias$ | async) as constancias"
-    >
-      <ion-card *ngFor="let constancia of constancias" class="constancia-card">
+    <div class="constancias-container">
+      <ion-card
+        *ngFor="let constancia of paginatedConstancias"
+        class="constancia-card"
+      >
         <ion-card-content>
           <!-- Header con nombre y estado -->
           <div class="card-header">
@@ -98,7 +96,6 @@
 
           <!-- Botones -->
           <div class="card-actions">
-            
             <ion-button
               fill="outline"
               size="small"
@@ -107,20 +104,62 @@
               <ion-icon name="eye-outline"></ion-icon>
               Ver Detalles
             </ion-button>
+            <ion-button
+              [disabled]="constancia.estado !== 'aprobada'"
+              color="success"
+              fill="clear"
+              (click)="generatePDF(constancia)"
+            >
+              <ion-icon name="document-text-outline"></ion-icon>
+              PDF
+            </ion-button>
           </div>
         </ion-card-content>
       </ion-card>
 
       <!-- Estado vacío -->
-      <div *ngIf="constancias.length === 0" class="empty-state">
-        <ion-icon name="document-outline"></ion-icon>
-        <p>No se encontraron constancias</p>
+      <div *ngIf="paginatedConstancias.length === 0" class="empty-state">
+        <ion-icon name="document-outline" class="large-icon"></ion-icon>
+        <h3>No se encontraron constancias</h3>
+        <p>No hay constancias que coincidan con los filtros aplicados</p>
       </div>
     </div>
 
     <!-- Loading -->
     <div *ngIf="loading" class="loading-container">
       <ion-spinner></ion-spinner>
+      <p>Cargando constancias...</p>
+    </div>
+
+    <!-- Paginación -->
+    <div
+      class="pagination-container ion-text-center ion-margin-vertical"
+      *ngIf="hasConstancias"
+    >
+      <ion-button
+        fill="clear"
+        [disabled]="currentPage === 1"
+        (click)="prevPage()"
+      >
+        <ion-icon name="chevron-back"></ion-icon>
+      </ion-button>
+
+      <ion-button
+        fill="clear"
+        [color]="page === currentPage ? 'primary' : 'medium'"
+        *ngFor="let page of pages"
+        (click)="goToPage(page)"
+      >
+        {{ page }}
+      </ion-button>
+
+      <ion-button
+        fill="clear"
+        [disabled]="currentPage === totalPages"
+        (click)="nextPage()"
+      >
+        <ion-icon name="chevron-forward"></ion-icon>
+      </ion-button>
     </div>
   </div>
 </ion-content>

@@ -1,7 +1,7 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { FormControl } from '@angular/forms';
-import { Observable, Subject, combineLatest } from 'rxjs';
-import { takeUntil, debounceTime, map, startWith } from 'rxjs/operators';
+import { Observable, Subject, combineLatest, of } from 'rxjs';
+import { takeUntil, debounceTime, map, startWith, take } from 'rxjs/operators';
 import { FirebaseService } from 'src/app/services/firebase.service';
 import { UtilsService } from 'src/app/services/utils.service';
 import { Constancia } from 'src/app/models/constancia.model';
@@ -31,6 +31,8 @@ export class UserConstanciaPage implements OnInit, OnDestroy {
   totalPages: number = 1;
   pages: number[] = [];
   Math = Math;
+  private allConstancias: Constancia[] = [];
+
   // Tipos de constancias disponibles
   tiposConstancia = [
     { value: 'todos', label: 'Todos' },
@@ -68,18 +70,18 @@ export class UserConstanciaPage implements OnInit, OnDestroy {
     tipo: string,
     estado: string
   ): Constancia[] {
-    const user = this.utilsSvc.getFromLocalStorage('user');
-    return constancias.filter(constancia => {
-      // Filtrar solo las constancias del usuario actual
-      if (constancia.userId !== user.uid) return false;
+    searchTerm = searchTerm || '';
 
+    return constancias.filter(constancia => {
       const searchString = [
         constancia.nombre,
         constancia.apellidos,
         constancia.documento
       ].join(' ').toLowerCase();
 
-      const matchesSearch = searchString.includes(searchTerm.toLowerCase().trim());
+      const termToSearch = searchTerm.toLowerCase().trim();
+
+      const matchesSearch = searchString.includes(termToSearch);
       const matchesTipo = tipo === 'todos' || constancia.tipo === tipo;
       const matchesEstado = estado === 'todos' || constancia.estado === estado;
 
@@ -87,13 +89,16 @@ export class UserConstanciaPage implements OnInit, OnDestroy {
     });
   }
 
-  loadConstancias() {
+  private loadConstancias() {
     try {
+      this.loading = true;
+      this.error = false;
+  
       const constanciasRef = this.firebaseSvc.getCollectionData(
         'constancias',
         [orderBy('createdAt', 'desc')]
       ) as Observable<Constancia[]>;
-
+  
       this.filteredConstancias$ = combineLatest([
         constanciasRef,
         this.searchControl.valueChanges.pipe(startWith('')),
@@ -102,19 +107,29 @@ export class UserConstanciaPage implements OnInit, OnDestroy {
       ]).pipe(
         debounceTime(300),
         map(([constancias, searchTerm, tipo, estado]) => {
-          const filtered = this.filterConstancias(constancias, searchTerm || '', tipo, estado);
+          this.allConstancias = constancias;
+          const filtered = this.filterConstancias(constancias, searchTerm, tipo, estado);
+          this.totalPages = Math.ceil(filtered.length / this.pageSize);
+  
+          if (this.currentPage > this.totalPages) {
+            this.currentPage = 1;
+          }
+  
+          this.updatePaginatedConstancias(filtered);
+          this.updatePagination();
           this.loading = false;
           return filtered;
         }),
         takeUntil(this.destroy$)
       );
+  
+      this.filteredConstancias$.subscribe();
     } catch (error) {
-      console.error('Error loading constancias:', error);
+      console.error('Error in loadConstancias:', error);
       this.error = true;
       this.loading = false;
     }
   }
-
   async openConstanciaDetail(constancia: Constancia) {
     const modal = await this.modalController.create({
       component: ConstanciaDetailComponent,
@@ -229,5 +244,56 @@ export class UserConstanciaPage implements OnInit, OnDestroy {
     this.searchControl.setValue('');
     this.tipoControl.setValue('todos');
     this.estadoControl.setValue('todos');
+  }
+
+  // Agregar métodos de paginación
+  updatePaginatedConstancias(constancias: Constancia[]) {
+    const start = (this.currentPage - 1) * this.pageSize;
+    const end = start + this.pageSize;
+    this.paginatedConstancias = constancias.slice(start, end);
+  }
+
+  updatePagination() {
+    let startPage = Math.max(1, this.currentPage - 2);
+    let endPage = Math.min(this.totalPages, startPage + 4);
+
+    if (endPage - startPage < 4) {
+      startPage = Math.max(1, endPage - 4);
+    }
+
+    this.pages = Array.from(
+      { length: endPage - startPage + 1 },
+      (_, i) => startPage + i
+    );
+  }
+
+  goToPage(page: number) {
+    if (page >= 1 && page <= this.totalPages) {
+      this.currentPage = page;
+      combineLatest([
+        of(this.allConstancias),
+        of(this.searchControl.value || ''),
+        of(this.tipoControl.value || 'todos'),
+        of(this.estadoControl.value || 'todos')
+      ]).pipe(
+        take(1),
+        map(([constancias, searchTerm, tipo, estado]) => {
+          const filtered = this.filterConstancias(constancias, searchTerm, tipo, estado);
+          this.updatePaginatedConstancias(filtered);
+          this.updatePagination();
+        })
+      ).subscribe();
+    }
+  }
+
+  nextPage() {
+    this.goToPage(this.currentPage + 1);
+  }
+
+  prevPage() {
+    this.goToPage(this.currentPage - 1);
+  }
+  get hasConstancias(): boolean {
+    return this.allConstancias.length > 0;
   }
 }
