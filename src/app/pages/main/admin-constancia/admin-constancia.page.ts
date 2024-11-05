@@ -11,6 +11,7 @@ import { ModalController } from '@ionic/angular';
 import { ConstanciaDetailComponent } from 'src/app/shared/components/constancia-detail/constancia-detail.component';
 import { EditConstanciaComponent } from 'src/app/shared/components/edit-constancia/edit-constancia.component';
 import { User } from 'src/app/models/user.models';
+import { CreateConstanciaComponent } from 'src/app/shared/components/create-constancia/create-constancia.component';
 
 declare var pdfMake: any;
 
@@ -231,49 +232,6 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
     // Obtener la etiqueta del nuevo estado
     const estadoLabel = this.estadosConstancia.find(e => e.value === newStatus)?.label || newStatus;
 
-    const alert = await this.utilsSvc.presentAlert({
-      header: 'Confirmar cambio',
-      mode: 'ios',
-      message: `¿Está seguro de cambiar el estado a "${estadoLabel}"?`,
-      buttons: [
-        {
-          text: 'Cancelar',
-          role: 'cancel',
-          handler: () => {
-            // Recargar las constancias para revertir el cambio visual
-            this.loadConstancias();
-          }
-        },
-        {
-          text: 'Aceptar',
-          handler: async () => {
-            const loading = await this.utilsSvc.loading();
-            try {
-              await loading.present();
-              await this.firebaseSvc.updateConstanciaStatus(constancia.id, newStatus);
-
-              this.utilsSvc.presentToast({
-                message: 'Estado actualizado correctamente',
-                color: 'success',
-                duration: 1500,
-                position: 'middle'
-              });
-            } catch (error) {
-              console.error('Error al actualizar estado:', error);
-              this.utilsSvc.presentToast({
-                message: 'Error al actualizar el estado',
-                color: 'danger',
-                duration: 1500,
-                position: 'middle'
-              });
-              this.loadConstancias();
-            } finally {
-              loading.dismiss();
-            }
-          }
-        }
-      ]
-    });
 
   }
 
@@ -378,11 +336,7 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
   }
 
   // Método auxiliar para obtener el logo en base64
-  private async getBase64Logo(): Promise<string> {
-    // Aquí puedes retornar el base64 de tu logo
-    // Por ahora retornamos un placeholder
-    return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...'; // Agregar tu logo en base64
-  }
+
   async generateMonthlyReport() {
     try {
       // Lógica para generar el informe mensual
@@ -563,6 +517,7 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
       return;
     }
 
+    // Mostrar alerta de confirmación
     const alert = await this.utilsSvc.presentAlert({
       header: 'Confirmar eliminación',
       mode: 'ios',
@@ -587,6 +542,7 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
                 duration: 2500,
                 position: 'middle'
               });
+              // Recargar la lista de constancias
               this.loadConstancias();
             } catch (error) {
               console.error('Error al eliminar constancia:', error);
@@ -631,6 +587,19 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
     const { data } = await modal.onWillDismiss();
     if (data?.updated) {
       // Recargar las constancias si se realizó una actualización
+      this.loadConstancias();
+    }
+  }
+  async createConstancia() {
+    const modal = await this.modalController.create({
+      component: CreateConstanciaComponent,
+      cssClass: 'modal-full-right-side'
+    });
+
+    await modal.present();
+
+    const { data } = await modal.onWillDismiss();
+    if (data?.created) {
       this.loadConstancias();
     }
   }

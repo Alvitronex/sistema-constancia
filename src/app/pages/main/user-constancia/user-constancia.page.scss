@@ -66,13 +66,13 @@ ion-button.nueva-constancia {
 
 // Searchbar
 ion-searchbar {
-  --background: white;
-  --box-shadow: none;
+  --background: var(--ion-color-light);
   --border-radius: 8px;
-  --placeholder-color: var(--ion-color-medium);
-  --icon-color: var(--ion-color-medium);
-  border: 1px solid #e5e7eb;
-  height: 45px;
+  margin-bottom: 1rem;
+
+  &.focused {
+    --background: var(--ion-color-light-shade);
+  }
 }
 
 // Constancia Card
