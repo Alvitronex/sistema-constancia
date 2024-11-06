@@ -27,7 +27,7 @@ export class UserConstanciaPage implements OnInit, OnDestroy, AfterViewInit {
   estadoControl = new FormControl('todos');
   private destroy$ = new Subject<void>();
   paginatedConstancias: Constancia[] = [];
-  pageSize: number = 8;
+  pageSize: number = 5;
   currentPage: number = 1;
   totalPages: number = 1;
   pages: number[] = [];

@@ -1,7 +1,7 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { FormControl } from '@angular/forms';
 import { Observable, Subject, combineLatest, of } from 'rxjs';
-import { takeUntil, debounceTime, distinctUntilChanged, map, startWith, take } from 'rxjs/operators';
+import { takeUntil, debounceTime, distinctUntilChanged, map, startWith, take, mergeMap } from 'rxjs/operators';
 import { FirebaseService } from 'src/app/services/firebase.service';
 import { UtilsService } from 'src/app/services/utils.service';
 import { Constancia } from 'src/app/models/constancia.model';
@@ -49,7 +49,7 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
   // Estados de constancias disponibles
   estadosConstancia = [
     { value: 'pendiente', label: 'Pendiente', color: 'warning' },
-    { value: 'aprobada', laabel: 'Aprobada', color: 'success' },
+    { value: 'aprobada', label: 'Aprobada', color: 'success' }, // Corregido 'laabel' a 'label'
     { value: 'rechazada', label: 'Rechazada', color: 'danger' }
   ];
 
@@ -71,11 +71,157 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
     this.loadConstancias();
     this.loadAvailableMonths();
   }
+  private async loadConstancias() {
+    try {
+      this.loading = true;
+      this.error = false;
 
+      // Primero obtener todos los usuarios
+      const usersRef = this.firebaseSvc.getCollectionData(
+        'users',
+        [orderBy('name', 'desc')]
+      ) as Observable<User[]>;
+
+      // Transformar el observable de usuarios para obtener las constancias
+      this.filteredConstancias$ = usersRef.pipe(
+        mergeMap(users => {
+          // Por cada usuario, crear un observable de sus constancias
+          const constanciasObservables = users.map(user => {
+            const path = `users/${user.uid}/constancia`;
+            return this.firebaseSvc.getCollectionData(
+              path,
+              [orderBy('createdAt', 'desc')]
+            ).pipe(
+              // Agregar el userId a cada constancia
+              map((constancias: Constancia[]) =>
+                constancias.map(constancia => ({
+                  ...constancia,
+                  userId: user.uid,
+                  userName: user.name,
+                  userEmail: user.email
+                }))
+              )
+            );
+          });
+
+          // Combinar todas las constancias
+          return combineLatest(constanciasObservables).pipe(
+            map(constanciasArrays => {
+              // Aplanar el array de arrays de constancias
+              return constanciasArrays.reduce((acc, curr) => [...acc, ...curr], []);
+            })
+          );
+        }),
+        // Combinar con los filtros
+        mergeMap(allConstancias => {
+          return combineLatest([
+            of(allConstancias),
+            this.searchControl.valueChanges.pipe(startWith('')),
+            this.tipoControl.valueChanges.pipe(startWith('todos')),
+            this.estadoControl.valueChanges.pipe(startWith('todos'))
+          ]).pipe(
+            debounceTime(300),
+            map(([constancias, searchTerm, tipo, estado]) => {
+              this.allConstancias = constancias;
+              const filtered = this.filterConstancias(constancias, searchTerm, tipo, estado);
+              this.totalPages = Math.ceil(filtered.length / this.pageSize);
+
+              if (this.currentPage > this.totalPages) {
+                this.currentPage = 1;
+              }
+
+              this.updatePaginatedConstancias(filtered);
+              this.updatePagination();
+              this.loading = false;
+              return filtered;
+            })
+          );
+        }),
+        takeUntil(this.destroy$)
+      );
+
+      // Suscribirse al observable
+      this.filteredConstancias$.subscribe(
+        () => {
+          this.loading = false;
+        },
+        error => {
+          console.error('Error loading constancias:', error);
+          this.error = true;
+          this.loading = false;
+        }
+      );
+
+    } catch (error) {
+      console.error('Error in loadConstancias:', error);
+      this.error = true;
+      this.loading = false;
+    }
+  }
+
+  // === Confirmar eliminación de constancia ===
+  async onDeleteConstancia(constancia: Constancia) {
+    if (!this.isAdmin()) {
+      this.utilsSvc.presentToast({
+        message: 'No tienes permisos para eliminar constancias',
+        color: 'warning',
+        duration: 2500,
+        position: 'middle'
+      });
+      return;
+    }
+
+    const alert = await this.utilsSvc.presentAlert({
+      header: 'Confirmar eliminación',
+      mode: 'ios',
+      message: '¿Está seguro de eliminar esta constancia? Esta acción no se puede deshacer.',
+      buttons: [
+        { text: 'Cancelar', role: 'cancel' },
+        {
+          text: 'Eliminar',
+          role: 'destructive',
+          handler: async () => {
+            const loading = await this.utilsSvc.loading();
+            try {
+              await loading.present();
+
+              // Usar el path correcto con el userId
+              const path = `users/${constancia.userId}/constancia/${constancia.id}`;
+              await this.firebaseSvc.deleteDocument(path);
+
+              this.utilsSvc.presentToast({
+                message: 'Constancia eliminada correctamente',
+                color: 'success',
+                duration: 2500,
+                position: 'middle'
+              });
+
+              // Recargar las constancias
+              this.loadConstancias();
+            } catch (error) {
+              console.error('Error al eliminar constancia:', error);
+              this.utilsSvc.presentToast({
+                message: 'Error al eliminar la constancia',
+                color: 'danger',
+                duration: 2500,
+                position: 'middle'
+              });
+            } finally {
+              loading.dismiss();
+            }
+          }
+        }
+      ]
+    });
+  }
 
   isAdmin(): boolean {
     const user: User = this.utilsSvc.getFromLocalStorage('user');
     return user?.role === 'admin';
+  }
+  isPlanillero(): boolean {
+    const user: User = this.utilsSvc.getFromLocalStorage('user');
+    return user?.role === 'planillero';
   }
   ngOnDestroy() {
     this.destroy$.next();
@@ -115,51 +261,6 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
 
       return matchesSearch && matchesTipo && matchesEstado;
     });
-  }
-  private loadConstancias() {
-    try {
-      this.loading = true;
-      this.error = false;
-
-      const constanciasRef = this.firebaseSvc.getCollectionData(
-        'constancias',
-        [orderBy('createdAt', 'desc')]
-      ) as Observable<Constancia[]>;
-
-      // Combinar todos los observables de filtros
-      this.filteredConstancias$ = combineLatest([
-        constanciasRef,
-        this.searchControl.valueChanges.pipe(startWith('')),
-        this.tipoControl.valueChanges.pipe(startWith('todos')),
-        this.estadoControl.valueChanges.pipe(startWith('todos'))
-      ]).pipe(
-        debounceTime(300),
-        map(([constancias, searchTerm, tipo, estado]) => {
-          this.allConstancias = constancias;
-          const filtered = this.filterConstancias(constancias, searchTerm, tipo, estado);
-          this.totalPages = Math.ceil(filtered.length / this.pageSize);
-
-          // Reset a primera página cuando cambian los filtros
-          if (this.currentPage > this.totalPages) {
-            this.currentPage = 1;
-          }
-
-          this.updatePaginatedConstancias(filtered);
-          this.updatePagination();
-          this.loading = false;
-          return filtered;
-        }),
-        takeUntil(this.destroy$)
-      );
-
-      // Mantener la suscripción activa
-      this.filteredConstancias$.subscribe();
-
-    } catch (error) {
-      console.error('Error in loadConstancias:', error);
-      this.error = true;
-      this.loading = false;
-    }
   }
 
   // Agregar métodos de paginación
@@ -226,12 +327,79 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
   }
 
   async onUpdateStatus(constancia: Constancia, newStatus: string) {
+    // Verificar si es admin
+    if (!this.isAdmin() && !this.isPlanillero()) {
+      this.utilsSvc.presentToast({
+        message: 'No tienes permisos para cambiar el estado de las constancias',
+        color: 'warning',
+        duration: 2500,
+        position: 'middle'
+      });
+      return;
+    }
+
     // Si el estado es el mismo, no hacemos nada
     if (constancia.estado === newStatus) return;
 
     // Obtener la etiqueta del nuevo estado
     const estadoLabel = this.estadosConstancia.find(e => e.value === newStatus)?.label || newStatus;
 
+    // Mostrar alerta de confirmación
+    const alert = await this.utilsSvc.presentAlert({
+      header: 'Cambiar Estado',
+      message: `¿Está seguro de cambiar el estado a ${estadoLabel}?`,
+      mode: 'ios',
+      buttons: [
+        {
+          text: 'Cancelar',
+          role: 'cancel'
+        },
+        {
+          text: 'Sí, cambiar',
+          handler: async () => {
+            const loading = await this.utilsSvc.loading();
+            try {
+              await loading.present();
+
+              // Construir el path correcto usando el userId
+              const path = `users/${constancia.userId}/constancia/${constancia.id}`;
+
+              // Preparar datos actualizados
+              const updatedData = {
+                estado: newStatus,
+                updatedAt: new Date().toISOString()
+              };
+
+              // Actualizar el documento
+              await this.firebaseSvc.updateDocument(path, updatedData);
+
+              this.utilsSvc.presentToast({
+                message: 'Estado actualizado correctamente',
+                color: 'success',
+                duration: 2500,
+                position: 'middle',
+                icon: 'checkmark-circle-outline'
+              });
+
+              // Recargar constancias
+              this.loadConstancias();
+
+            } catch (error) {
+              console.error('Error al actualizar estado:', error);
+              this.utilsSvc.presentToast({
+                message: 'Error al actualizar el estado',
+                color: 'danger',
+                duration: 2500,
+                position: 'middle',
+                icon: 'alert-circle-outline'
+              });
+            } finally {
+              loading.dismiss();
+            }
+          }
+        }
+      ]
+    });
 
   }
 
@@ -504,61 +672,6 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
       'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
     ];
     return meses[month - 1];
-  }
-  async onDeleteConstancia(constancia: Constancia) {
-    // Verificar si el usuario es admin antes de proceder
-    if (!this.isAdmin()) {
-      this.utilsSvc.presentToast({
-        message: 'No tienes permisos para eliminar constancias',
-        color: 'warning',
-        duration: 2500,
-        position: 'middle'
-      });
-      return;
-    }
-
-    // Mostrar alerta de confirmación
-    const alert = await this.utilsSvc.presentAlert({
-      header: 'Confirmar eliminación',
-      mode: 'ios',
-      message: '¿Está seguro de eliminar esta constancia? Esta acción no se puede deshacer.',
-      buttons: [
-        {
-          text: 'Cancelar',
-          role: 'cancel'
-        },
-        {
-          text: 'Eliminar',
-          role: 'destructive',
-          handler: async () => {
-            const loading = await this.utilsSvc.loading();
-            try {
-              await loading.present();
-              await this.firebaseSvc.deleteConstancia(constancia.id);
-
-              this.utilsSvc.presentToast({
-                message: 'Constancia eliminada correctamente',
-                color: 'success',
-                duration: 2500,
-                position: 'middle'
-              });
-              // Recargar la lista de constancias
-              this.loadConstancias();
-            } catch (error) {
-              console.error('Error al eliminar constancia:', error);
-              this.utilsSvc.presentToast({
-                message: 'Error al eliminar la constancia',
-                color: 'danger',
-                duration: 2500,
-                position: 'middle'
-              });
-            } finally {
-              loading.dismiss();
-            }
-          }
-        }
-      ]
-    });
   }
 
 
