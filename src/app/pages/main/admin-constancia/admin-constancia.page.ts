@@ -12,7 +12,9 @@ import { ConstanciaDetailComponent } from 'src/app/shared/components/constancia-
 import { EditConstanciaComponent } from 'src/app/shared/components/edit-constancia/edit-constancia.component';
 import { User } from 'src/app/models/user.models';
 import { CreateConstanciaComponent } from 'src/app/shared/components/create-constancia/create-constancia.component';
-
+import { Filesystem, Directory } from '@capacitor/filesystem';
+import { FileOpener } from '@awesome-cordova-plugins/file-opener/ngx';
+import { Platform } from '@ionic/angular';
 declare var pdfMake: any;
 
 @Component({
@@ -56,7 +58,9 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
   constructor(
     private firebaseSvc: FirebaseService,
     private utilsSvc: UtilsService,
-    private modalController: ModalController
+    private modalController: ModalController,
+    private platform: Platform,
+    private fileOpener: FileOpener
   ) { }
 
   async openConstanciaDetail(constancia: Constancia) {
@@ -79,7 +83,7 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
       // Primero obtener todos los usuarios
       const usersRef = this.firebaseSvc.getCollectionData(
         'users',
-        [orderBy('name', 'desc')]
+        [orderBy('name', 'asc')]
       ) as Observable<User[]>;
 
       // Transformar el observable de usuarios para obtener las constancias
@@ -90,7 +94,7 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
             const path = `users/${user.uid}/constancia`;
             return this.firebaseSvc.getCollectionData(
               path,
-              [orderBy('createdAt', 'desc')]
+              [orderBy('createdAt', 'asc')]
             ).pipe(
               // Agregar el userId a cada constancia
               map((constancias: Constancia[]) =>
@@ -422,60 +426,54 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
     try {
       await loading.present();
 
-      // Formatear la fecha actual
       const fechaEmision = new Date().toLocaleDateString('es-ES', {
         day: '2-digit',
         month: 'long',
         year: 'numeric'
       });
 
-      const docDefinition = {
-        pageSize: 'A4',
-        pageMargins: [40, 60, 40, 60],
+      const docDefinition: any = {
         content: [
           {
             text: 'CONSTANCIA',
-            style: 'header',
-            margin: [0, 0, 0, 20]
+            style: 'header'
           },
           {
-            text: 'A QUIEN CORRESPONDA:',
-            style: 'subheader',
-            margin: [0, 20, 0, 20]
+            text: '\nA QUIEN CORRESPONDA:',
+            style: 'subheader'
           },
           {
             text: [
-              'Por medio de la presente se hace constar que ',
+              '\nPor medio de la presente se hace constar que ',
               { text: `${constancia.nombre} ${constancia.apellidos}`, bold: true },
               ', identificado(a) con documento número ',
               { text: constancia.documento, bold: true },
               ', solicita una constancia de tipo ',
               { text: constancia.tipo.toLowerCase(), bold: true },
               ' por el siguiente motivo:\n\n'
-            ],
-            margin: [0, 0, 0, 20]
+            ]
           },
           {
             text: constancia.motivo,
-            margin: [20, 0, 20, 20],
-            italics: true
+            italics: true,
+            margin: [20, 0, 20, 20]
           },
           {
             text: `\nFecha de emisión: ${fechaEmision}`,
             alignment: 'right',
-            margin: [0, 30, 0, 20]
+            margin: [0, 20, 0, 40]
           },
           {
             text: '_______________________\nFirma Autorizada',
-            alignment: 'center',
-            margin: [0, 50, 0, 0]
+            alignment: 'center'
           }
         ],
         styles: {
           header: {
             fontSize: 22,
             bold: true,
-            alignment: 'center'
+            alignment: 'center',
+            margin: [0, 0, 0, 20]
           },
           subheader: {
             fontSize: 14,
@@ -486,16 +484,61 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
 
       this.utilsSvc.pdfMake();
 
-      pdfMake.createPdf(docDefinition).open();  // Cambiamos a .open() directamente
+      if (this.platform.is('capacitor')) {
+        // Versión móvil
+        const pdfDocGenerator = pdfMake.createPdf(docDefinition);
 
-      this.utilsSvc.presentToast({
-        message: 'PDF generado correctamente',
-        color: 'success',
-        duration: 2500,
-        position: 'middle'
-      });
+        pdfDocGenerator.getBase64(async (base64data) => {
+          try {
+            const fileName = `constancia_${constancia.documento}_${new Date().getTime()}.pdf`;
+
+            // Guardar el archivo en el dispositivo
+            const result = await Filesystem.writeFile({
+              path: fileName,
+              data: base64data,
+              directory: Directory.Documents,
+              recursive: true
+            });
+
+            // Obtener la ruta real del archivo
+            const filePath = result.uri;
+
+            // Abrir el PDF con la aplicación predeterminada
+            await this.fileOpener.open(
+              filePath,
+              'application/pdf'
+            );
+
+            this.utilsSvc.presentToast({
+              message: 'PDF guardado y abierto correctamente',
+              color: 'success',
+              duration: 2500,
+              position: 'middle'
+            });
+          } catch (error) {
+            console.error('Error al guardar/abrir PDF:', error);
+            this.utilsSvc.presentToast({
+              message: 'Error al procesar el PDF',
+              color: 'danger',
+              duration: 2500,
+              position: 'middle'
+            });
+          }
+        });
+      } else {
+        // Versión web
+        pdfMake.createPdf(docDefinition).open();
+
+        this.utilsSvc.presentToast({
+          message: 'PDF generado correctamente',
+          color: 'success',
+          duration: 2500,
+          position: 'middle'
+        });
+      }
+
     } catch (error) {
-      console.error('Error al generar PDF:', error);
+      console.error('Error generando PDF:', error);
       this.utilsSvc.presentToast({
         message: 'Error al generar el PDF',
         color: 'danger',

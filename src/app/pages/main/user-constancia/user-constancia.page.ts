@@ -11,6 +11,9 @@ import { ConstanciaDetailComponent } from 'src/app/shared/components/constancia-
 import { CreateConstanciaComponent } from 'src/app/shared/components/create-constancia/create-constancia.component';
 import * as pdfMake from 'pdfmake/build/pdfmake';
 import { User } from 'src/app/models/user.models';
+import { Filesystem, Directory } from '@capacitor/filesystem';
+import { FileOpener } from '@awesome-cordova-plugins/file-opener/ngx';
+import { Platform } from '@ionic/angular';
 
 @Component({
   selector: 'app-user-constancia',
@@ -54,7 +57,9 @@ export class UserConstanciaPage implements OnInit, OnDestroy, AfterViewInit {
   constructor(
     private firebaseSvc: FirebaseService,
     private utilsSvc: UtilsService,
-    private modalController: ModalController
+    private modalController: ModalController,
+    private platform: Platform,
+    private fileOpener: FileOpener
   ) { }
 
   ngOnInit() {
@@ -113,7 +118,6 @@ export class UserConstanciaPage implements OnInit, OnDestroy, AfterViewInit {
     try {
       await loading.present();
 
-      // Formatear la fecha actual
       const fechaEmision = new Date().toLocaleDateString('es-ES', {
         day: '2-digit',
         month: 'long',
@@ -171,7 +175,59 @@ export class UserConstanciaPage implements OnInit, OnDestroy, AfterViewInit {
       };
 
       this.utilsSvc.pdfMake();
-      pdfMake.createPdf(docDefinition).open();
+
+      if (this.platform.is('capacitor')) {
+        // Versión móvil
+        const pdfDocGenerator = pdfMake.createPdf(docDefinition);
+
+        pdfDocGenerator.getBase64(async (base64data) => {
+          try {
+            const fileName = `constancia_${constancia.documento}_${new Date().getTime()}.pdf`;
+
+            // Guardar el archivo en el dispositivo
+            const result = await Filesystem.writeFile({
+              path: fileName,
+              data: base64data,
+              directory: Directory.Documents,
+              recursive: true
+            });
+
+            // Obtener la ruta real del archivo
+            const filePath = result.uri;
+
+            // Abrir el PDF con la aplicación predeterminada
+            await this.fileOpener.open(
+              filePath,
+              'application/pdf'
+            );
+
+            this.utilsSvc.presentToast({
+              message: 'PDF guardado y abierto correctamente',
+              color: 'success',
+              duration: 2500,
+              position: 'middle'
+            });
+          } catch (error) {
+            console.error('Error al guardar/abrir PDF:', error);
+            this.utilsSvc.presentToast({
+              message: 'Error al procesar el PDF',
+              color: 'danger',
+              duration: 2500,
+              position: 'middle'
+            });
+          }
+        });
+      } else {
+        // Versión web
+        pdfMake.createPdf(docDefinition).open();
+
+        this.utilsSvc.presentToast({
+          message: 'PDF generado correctamente',
+          color: 'success',
+          duration: 2500,
+          position: 'middle'
+        });
+      }
 
     } catch (error) {
       console.error('Error generando PDF:', error);
