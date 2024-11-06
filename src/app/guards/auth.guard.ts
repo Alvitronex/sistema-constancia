@@ -32,7 +32,7 @@ export class AuthGuard implements CanActivate {
               if (user.role === route.data['requiredRole']) {
                 resolve(true);
               } else {
-                this.utilsSvc.routerLink('/main/home');
+                this.utilsSvc.routerLink('/main/user-constancia');
                 this.utilsSvc.presentToast({
                   message: 'No tienes permisos para acceder a esta sección',
                   duration: 2500,
