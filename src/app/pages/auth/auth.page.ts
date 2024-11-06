@@ -10,7 +10,7 @@ import { UtilsService } from 'src/app/services/utils.service';
   templateUrl: './auth.page.html',
   styleUrls: ['./auth.page.scss'],
 })
-export class AuthPage implements OnInit {
+export class AuthPage {
 
   form = new FormGroup({
     email: new FormControl('', [Validators.required, Validators.email]),
@@ -20,10 +20,9 @@ export class AuthPage implements OnInit {
   firebaseSvc = inject(FirebaseService);
   utilsSvc = inject(UtilsService);
 
-  ngOnInit() {
-  }
 
- async submit() {
+
+  async submit() {
     if (this.form.valid) {
 
       const loading = await this.utilsSvc.loading();
@@ -60,20 +59,20 @@ export class AuthPage implements OnInit {
       await loading.present();
 
       let path = `users/${uid}`;
-      
+
       this.firebaseSvc.getDocument(path).then((user: User) => {
 
-      this.utilsSvc.saveInLocalStorage('user', user);
-      this.utilsSvc.routerLink('/main/home');
-      this.form.reset();
+        this.utilsSvc.saveInLocalStorage('user', user);
+        this.utilsSvc.routerLink('/main/user-constancia');
+        this.form.reset();
 
-      this.utilsSvc.presentToast({
-        message: `Te damos la bienvenida ${user.name}`,
-        duration: 1500,
-        color: 'primary',
-        position: 'middle',
-        icon: 'person-circle-outline'
-      })
+        this.utilsSvc.presentToast({
+          message: `Te damos la bienvenida ${user.name}`,
+          duration: 1500,
+          color: 'primary',
+          position: 'middle',
+          icon: 'person-circle-outline'
+        })
 
 
       }).catch(error => {

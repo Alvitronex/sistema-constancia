@@ -13,24 +13,24 @@ import { UtilsService } from 'src/app/services/utils.service';
 export class MainPage implements OnInit {
 
   planilleroPages = [
-    { title: 'Home', url: '/main/home', icon: 'home-outline' },
+    // { title: 'Home', url: '/main/home', icon: 'home-outline' },
     { title: 'Constancias', url: '/main/user-constancia', icon: 'document-outline' },
     { title: 'Administración Constancias', url: '/main/admin-constancia', icon: 'ribbon-outline' },
     { title: 'Perfil', url: '/main/profile', icon: 'person-outline' },
 
   ];
   admin = [
-    { title: 'Home', url: '/main/home', icon: 'home-outline' },
+    // { title: 'Home', url: '/main/home', icon: 'home-outline' },
 
-    { title: 'Panel Administrativo', url: '/main/panel', icon: 'people-outline' },
     { title: 'Constancias', url: '/main/user-constancia', icon: 'document-outline' },
+    { title: 'Panel Administrativo', url: '/main/panel', icon: 'people-outline' },
     { title: 'Administración Constancias', url: '/main/admin-constancia', icon: 'ribbon-outline' },
     { title: 'Perfil', url: '/main/profile', icon: 'person-outline' },
 
   ]
   // Páginas específicas para usuarios normales
   userPages = [
-    { title: 'Home', url: '/main/home', icon: 'home-outline' },
+    // { title: 'Home', url: '/main/home', icon: 'home-outline' },
     { title: 'Constancias', url: '/main/user-constancia', icon: 'document-outline' },
     { title: 'Perfil', url: '/main/profile', icon: 'person-outline' },
 

@@ -98,7 +98,8 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
                   ...constancia,
                   userId: user.uid,
                   userName: user.name,
-                  userEmail: user.email
+                  userEmail: user.email,
+                  userRole: user.role
                 }))
               )
             );
@@ -250,7 +251,10 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
       const searchString = [
         constancia.nombre,
         constancia.apellidos,
-        constancia.documento
+        constancia.documento,
+        constancia.nombre,
+        constancia.userId,
+        constancia.userEmail
       ].join(' ').toLowerCase();
 
       const termToSearch = searchTerm.toLowerCase().trim();
