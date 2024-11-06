@@ -676,7 +676,7 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
 
 
   async onEditConstancia(constancia: Constancia) {
-    // Verificar si el usuario es admin antes de proceder
+    // Verificar si el usuario es admin
     if (!this.isAdmin()) {
       this.utilsSvc.presentToast({
         message: 'No tienes permisos para editar constancias',
@@ -687,19 +687,21 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
       return;
     }
 
+    // Crear el modal
     const modal = await this.modalController.create({
       component: EditConstanciaComponent,
       componentProps: {
-        constancia
+        constancia: { ...constancia }, // Pasar una copia de la constancia
+        path: `users/${constancia.userId}/constancia/${constancia.id}` // Pasar el path correcto
       },
       cssClass: 'modal-full-right-side'
     });
 
     await modal.present();
 
+    // Manejar el resultado del modal
     const { data } = await modal.onWillDismiss();
     if (data?.updated) {
-      // Recargar las constancias si se realizó una actualización
       this.loadConstancias();
     }
   }
