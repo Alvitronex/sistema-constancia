@@ -15,6 +15,7 @@ import { CreateConstanciaComponent } from 'src/app/shared/components/create-cons
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { FileOpener } from '@awesome-cordova-plugins/file-opener/ngx';
 import { Platform } from '@ionic/angular';
+import { EmailService } from 'src/app/services/email.service';
 declare var pdfMake: any;
 
 @Component({
@@ -60,7 +61,9 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
     private utilsSvc: UtilsService,
     private modalController: ModalController,
     private platform: Platform,
-    private fileOpener: FileOpener
+    private fileOpener: FileOpener,
+    private emailSvc: EmailService,
+
   ) { }
 
   async openConstanciaDetail(constancia: Constancia) {
@@ -83,7 +86,7 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
       // Primero obtener todos los usuarios
       const usersRef = this.firebaseSvc.getCollectionData(
         'users',
-        [orderBy('name', 'asc')]
+        [orderBy('name', 'desc')]
       ) as Observable<User[]>;
 
       // Transformar el observable de usuarios para obtener las constancias
@@ -94,7 +97,7 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
             const path = `users/${user.uid}/constancia`;
             return this.firebaseSvc.getCollectionData(
               path,
-              [orderBy('createdAt', 'asc')]
+              [orderBy('createdAt', 'desc')]
             ).pipe(
               // Agregar el userId a cada constancia
               map((constancias: Constancia[]) =>
@@ -335,7 +338,7 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
   }
 
   async onUpdateStatus(constancia: Constancia, newStatus: string) {
-    // Verificar si es admin
+    // Verificar permisos
     if (!this.isAdmin() && !this.isPlanillero()) {
       this.utilsSvc.presentToast({
         message: 'No tienes permisos para cambiar el estado de las constancias',
@@ -346,22 +349,17 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
       return;
     }
 
-    // Si el estado es el mismo, no hacemos nada
+    // Verificar si el estado es diferente
     if (constancia.estado === newStatus) return;
 
-    // Obtener la etiqueta del nuevo estado
     const estadoLabel = this.estadosConstancia.find(e => e.value === newStatus)?.label || newStatus;
 
-    // Mostrar alerta de confirmación
     const alert = await this.utilsSvc.presentAlert({
       header: 'Cambiar Estado',
       message: `¿Está seguro de cambiar el estado a ${estadoLabel}?`,
       mode: 'ios',
       buttons: [
-        {
-          text: 'Cancelar',
-          role: 'cancel'
-        },
+        { text: 'Cancelar', role: 'cancel' },
         {
           text: 'Sí, cambiar',
           handler: async () => {
@@ -369,28 +367,124 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
             try {
               await loading.present();
 
-              // Construir el path correcto usando el userId
+              // 1. Actualizar el documento
               const path = `users/${constancia.userId}/constancia/${constancia.id}`;
-
-              // Preparar datos actualizados
-              const updatedData = {
+              const updatedConstancia = {
+                ...constancia,
                 estado: newStatus,
                 updatedAt: new Date().toISOString()
               };
 
-              // Actualizar el documento
-              await this.firebaseSvc.updateDocument(path, updatedData);
+              await this.firebaseSvc.updateDocument(path, updatedConstancia);
 
-              this.utilsSvc.presentToast({
-                message: 'Estado actualizado correctamente',
-                color: 'success',
-                duration: 2500,
-                position: 'middle',
-                icon: 'checkmark-circle-outline'
-              });
+              // 2. Si es aprobada, generar y enviar PDF por correo
+              if (newStatus === 'aprobada') {
+                try {
+                  const fechaEmision = new Date().toLocaleDateString('es-ES', {
+                    day: '2-digit',
+                    month: 'long',
+                    year: 'numeric'
+                  });
 
-              // Recargar constancias
-              this.loadConstancias();
+                  const docDefinition: any = {
+                    content: [
+                      {
+                        text: 'CONSTANCIA',
+                        style: 'header'
+                      },
+                      {
+                        text: '\nA QUIEN CORRESPONDA:',
+                        style: 'subheader'
+                      },
+                      {
+                        text: [
+                          '\nPor medio de la presente se hace constar que ',
+                          { text: `${updatedConstancia.nombre} ${updatedConstancia.apellidos}`, bold: true },
+                          ', identificado(a) con documento número ',
+                          { text: updatedConstancia.documento, bold: true },
+                          ', solicita una constancia de tipo ',
+                          { text: updatedConstancia.tipo.toLowerCase(), bold: true },
+                          ' por el siguiente motivo:\n\n'
+                        ]
+                      },
+                      {
+                        text: updatedConstancia.motivo,
+                        italics: true,
+                        margin: [20, 0, 20, 20]
+                      },
+                      {
+                        text: `\nFecha de emisión: ${fechaEmision}`,
+                        alignment: 'right',
+                        margin: [0, 20, 0, 40]
+                      },
+                      {
+                        text: '_______________________\nFirma Autorizada',
+                        alignment: 'center'
+                      }
+                    ],
+                    styles: {
+                      header: {
+                        fontSize: 22,
+                        bold: true,
+                        alignment: 'center',
+                        margin: [0, 0, 0, 20]
+                      },
+                      subheader: {
+                        fontSize: 14,
+                        bold: true
+                      }
+                    }
+                  };
+
+                  // Generar PDF y obtener base64
+                  const pdfDoc = pdfMake.createPdf(docDefinition);
+                  const pdfBase64 = await new Promise<string>((resolve, reject) => {
+                    pdfDoc.getBase64((data) => {
+                      if (data) {
+                        resolve(data);
+                      } else {
+                        reject(new Error('Error al generar PDF en base64'));
+                      }
+                    });
+                  });
+
+                  // Enviar correo con el PDF
+                  await this.emailSvc.sendConstanciaApprovedEmail(
+                    updatedConstancia,
+                    pdfBase64
+                  );
+
+                  this.utilsSvc.presentToast({
+                    message: `Constancia aprobada y enviada al correo ${updatedConstancia.userEmail}`,
+                    color: 'success',
+                    duration: 3000,
+                    position: 'middle',
+                    icon: 'checkmark-circle-outline'
+                  });
+
+                } catch (emailError) {
+                  console.error('Error al enviar el correo:', emailError);
+                  this.utilsSvc.presentToast({
+                    message: 'Estado actualizado pero hubo un error al enviar el correo. Por favor, intente generar el PDF manualmente.',
+                    color: 'warning',
+                    duration: 4000,
+                    position: 'middle',
+                    icon: 'warning-outline'
+                  });
+                }
+              } else {
+                // Para otros estados, solo mostrar mensaje de actualización
+                this.utilsSvc.presentToast({
+                  message: `Estado actualizado a ${estadoLabel}`,
+                  color: 'success',
+                  duration: 2500,
+                  position: 'middle',
+                  icon: 'checkmark-circle-outline'
+                });
+              }
+
+              // 3. Recargar la lista de constancias
+              await this.loadConstancias();
 
             } catch (error) {
               console.error('Error al actualizar estado:', error);
@@ -408,9 +502,67 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
         }
       ]
     });
-
   }
+  // Método auxiliar para generar el PDF
+  private generatePDF(constancia: Constancia) {
+    const docDefinition = {
+      content: [
+        {
+          text: 'CONSTANCIA',
+          style: 'header'
+        },
+        {
+          text: '\nA QUIEN CORRESPONDA:',
+          style: 'subheader'
+        },
+        {
+          text: [
+            '\nPor medio de la presente se hace constar que ',
+            { text: `${constancia.nombre} ${constancia.apellidos}`, bold: true },
+            ', identificado(a) con documento número ',
+            { text: constancia.documento, bold: true },
+            ', solicita una constancia de tipo ',
+            { text: constancia.tipo.toLowerCase(), bold: true },
+            ' por el siguiente motivo:\n\n'
+          ]
+        },
+        {
+          text: constancia.motivo,
+          italics: true,
+          margin: [20, 0, 20, 20]
+        },
+        {
+          text: `Estado: ${constancia.estado.toUpperCase()}`,
+          alignment: 'left',
+          color: 'green',
+          margin: [0, 20, 0, 20]
+        },
+        {
+          text: `\nFecha de emisión: ${new Date().toLocaleDateString()}`,
+          alignment: 'right',
+          margin: [0, 20, 0, 40]
+        },
+        {
+          text: '_______________________\nFirma Autorizada',
+          alignment: 'center'
+        }
+      ],
+      styles: {
+        header: {
+          fontSize: 22,
+          bold: true,
+          alignment: 'center',
+          margin: [0, 0, 0, 20]
+        },
+        subheader: {
+          fontSize: 14,
+          bold: true
+        }
+      }
+    };
 
+    return pdfMake.createPdf(docDefinition);
+  }
   async onGeneratePDF(constancia: Constancia) {
     if (constancia.estado !== 'aprobada') {
       this.utilsSvc.presentToast({
@@ -483,11 +635,10 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
       };
 
       this.utilsSvc.pdfMake();
+      const pdfDocGenerator = pdfMake.createPdf(docDefinition);
 
       if (this.platform.is('capacitor')) {
         // Versión móvil
-        const pdfDocGenerator = pdfMake.createPdf(docDefinition);
-
         pdfDocGenerator.getBase64(async (base64data) => {
           try {
             const fileName = `constancia_${constancia.documento}_${new Date().getTime()}.pdf`;
@@ -500,6 +651,9 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
               recursive: true
             });
 
+            // Enviar por correo
+            await this.emailSvc.sendConstanciaApprovedEmail(constancia, base64data);
+
             // Obtener la ruta real del archivo
             const filePath = result.uri;
 
@@ -510,13 +664,13 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
             );
 
             this.utilsSvc.presentToast({
-              message: 'PDF guardado y abierto correctamente',
+              message: 'PDF guardado, enviado por correo y abierto correctamente',
               color: 'success',
               duration: 2500,
               position: 'middle'
             });
           } catch (error) {
-            console.error('Error al guardar/abrir PDF:', error);
+            console.error('Error al procesar PDF:', error);
             this.utilsSvc.presentToast({
               message: 'Error al procesar el PDF',
               color: 'danger',
@@ -527,13 +681,31 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
         });
       } else {
         // Versión web
-        pdfMake.createPdf(docDefinition).open();
+        pdfDocGenerator.getBase64(async (base64data) => {
+          try {
+            // Enviar por correo
+            await this.emailSvc.sendConstanciaApprovedEmail(constancia, base64data);
 
-        this.utilsSvc.presentToast({
-          message: 'PDF generado correctamente',
-          color: 'success',
-          duration: 2500,
-          position: 'middle'
+            // Abrir el PDF
+            pdfMake.createPdf(docDefinition).open();
+
+            this.utilsSvc.presentToast({
+              message: 'PDF generado y enviado por correo correctamente',
+              color: 'success',
+              duration: 2500,
+              position: 'middle'
+            });
+          } catch (error) {
+            console.error('Error al enviar correo:', error);
+            this.utilsSvc.presentToast({
+              message: 'PDF generado pero hubo un error al enviar el correo',
+              color: 'warning',
+              duration: 2500,
+              position: 'middle'
+            });
+            // Abrir el PDF de todos modos
+            pdfMake.createPdf(docDefinition).open();
+          }
         });
       }
 

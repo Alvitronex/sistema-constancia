@@ -271,5 +271,48 @@ export class FirebaseService {
       throw error;
     }
   }
+  async sendEmailWithAttachment(emailData: {
+    to: string;
+    subject: string;
+    html: string;
+    attachments: Array<{
+      filename: string;
+      content: string;
+      encoding: string;
+      type: string;
+    }>;
+  }): Promise<void> {
+    try {
+      // Aquí implementarías la lógica de envío de correo
+      // Puedes usar Firebase Cloud Functions o un servicio de correo externo
 
+      // Por ahora, usaremos un enfoque simple con EmailJS o similar
+      const emailJsData = {
+        service_id: 'your_service_id',  // Reemplazar con tu ID de servicio
+        template_id: 'your_template_id', // Reemplazar con tu ID de template
+        user_id: 'your_user_id',        // Reemplazar con tu ID de usuario
+        template_params: {
+          to_email: emailData.to,
+          subject: emailData.subject,
+          message_html: emailData.html,
+          attachment: emailData.attachments[0].content
+        }
+      };
+
+      const response = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(emailJsData)
+      });
+
+      if (!response.ok) {
+        throw new Error('Error al enviar el correo');
+      }
+    } catch (error) {
+      console.error('Error en sendEmailWithAttachment:', error);
+      throw error;
+    }
+  }
 }

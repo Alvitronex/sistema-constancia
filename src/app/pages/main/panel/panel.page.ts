@@ -57,7 +57,7 @@ export class PanelPage implements OnInit, OnDestroy {
     try {
       const usersRef = this.firebaseSvc.getCollectionData(
         'users',
-        [orderBy('name', 'asc')]
+        [orderBy('name', 'desc')]
       ) as Observable<User[]>;
 
       this.filteredUsers$ = combineLatest([
