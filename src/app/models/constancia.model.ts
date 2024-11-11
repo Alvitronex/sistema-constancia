@@ -6,8 +6,9 @@ export interface Constancia {
     tipo: string;
     motivo: string;
     estado: string;
-    createdAt: string;
+    createdAt: string;  // Aseguramos que sea string
     updatedAt: string;
     userId: string;
     userEmail: string;
+
 }

@@ -65,7 +65,9 @@ export class AdminConstanciaPage implements OnInit, OnDestroy {
     private emailSvc: EmailService,
 
   ) { }
-
+  verInforme() {
+    this.utilsSvc.routerLink('/main/constancia-reporte');
+  }
   async openConstanciaDetail(constancia: Constancia) {
     const modal = await this.modalController.create({
       component: ConstanciaDetailComponent,

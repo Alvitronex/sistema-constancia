@@ -1,0 +1,121 @@
+<app-header [showMenu]="true" title="Reporte de Constancias"></app-header>
+
+<ion-content class="ion-padding">
+  <div class="filters-container">
+    <ion-row>
+      <ion-col size="12" size-md="6">
+        <ion-item>
+          <ion-label position="floating">Año</ion-label>
+          <ion-select
+            [(ngModel)]="selectedYear"
+            (ionChange)="onYearChange($event)"
+          >
+            <ion-select-option
+              *ngFor="let year of availableYears"
+              [value]="year"
+            >
+              {{ year }}
+            </ion-select-option>
+          </ion-select>
+        </ion-item>
+      </ion-col>
+
+      <ion-col size="12" size-md="6">
+        <ion-item>
+          <ion-label position="floating">Mes</ion-label>
+          <ion-select
+            [(ngModel)]="selectedMonth"
+            (ionChange)="onMonthChange($event)"
+          >
+            <ion-select-option value="all">Todos los meses</ion-select-option>
+            <ion-select-option
+              *ngFor="let month of months"
+              [value]="month.value"
+            >
+              {{ month.label }}
+            </ion-select-option>
+          </ion-select>
+        </ion-item>
+      </ion-col>
+      <ion-col size="auto">
+        <ion-button (click)="generateMonthlyReport()" color="secondary">
+          <ion-icon name="document-text-outline" slot="start"></ion-icon>
+          Generar Informe Mensual
+        </ion-button>
+      
+      </ion-col>
+    </ion-row>
+
+    <!-- Tarjetas de estadísticas -->
+    <ion-row class="stats-cards">
+      <ion-col size="12" size-md="4">
+        <ion-card>
+          <ion-card-content>
+            <div class="stat-header">
+              <ion-icon name="checkmark-circle" color="success"></ion-icon>
+              <h3>Aprobadas</h3>
+            </div>
+            <div class="stat-value">{{ stats?.aprobadas || 0 }}</div>
+          </ion-card-content>
+        </ion-card>
+      </ion-col>
+
+      <ion-col size="12" size-md="4">
+        <ion-card>
+          <ion-card-content>
+            <div class="stat-header">
+              <ion-icon name="close-circle" color="danger"></ion-icon>
+              <h3>Rechazadas</h3>
+            </div>
+            <div class="stat-value">{{ stats?.rechazadas || 0 }}</div>
+          </ion-card-content>
+        </ion-card>
+      </ion-col>
+
+      <ion-col size="12" size-md="4">
+        <ion-card>
+          <ion-card-content>
+            <div class="stat-header">
+              <ion-icon name="time" color="warning"></ion-icon>
+              <h3>Pendientes</h3>
+            </div>
+            <div class="stat-value">{{ stats?.pendientes || 0 }}</div>
+          </ion-card-content>
+        </ion-card>
+      </ion-col>
+    </ion-row>
+
+    <ion-row>
+      <ion-col>
+        <ion-button expand="block" (click)="generarPDF()">
+          <ion-icon name="document-text-outline" slot="start"></ion-icon>
+          Generar Reporte PDF
+        </ion-button>
+      </ion-col>
+    </ion-row>
+  </div>
+  <div class="chart-container">
+    <h2 class="section-title">
+      <ion-icon name="stats-chart-outline"></ion-icon>
+      Evolución de Constancias
+    </h2>
+
+    <div class="chart-wrapper" *ngIf="stats?.porMes?.length > 0">
+      <canvas #barChart></canvas>
+    </div>
+    <!-- Contenido cuando no hay datos -->
+    <div
+      *ngIf="!loading && (!stats || getTotalConstancias() === 0)"
+      class="empty-state"
+    >
+      <ion-icon name="document-text-outline" class="large-icon"></ion-icon>
+      <h3>No hay constancias</h3>
+      <p>No se encontraron constancias para el período seleccionado</p>
+    </div>
+  </div>
+  <!-- Indicador de carga -->
+  <div *ngIf="loading" class="loading-container">
+    <ion-spinner></ion-spinner>
+    <p>Cargando estadísticas...</p>
+  </div>
+</ion-content>

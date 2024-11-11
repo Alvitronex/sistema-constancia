@@ -8,7 +8,7 @@ const routes: Routes = [
     path: '',
     component: MainPage,
     children: [
-     
+
       {
         path: 'profile',
         loadChildren: () => import('./profile/profile.module').then(m => m.ProfilePageModule)
@@ -23,10 +23,15 @@ const routes: Routes = [
       {
         path: 'admin-constancia',
         loadChildren: () => import('./admin-constancia/admin-constancia.module').then(m => m.AdminConstanciaPageModule)
-      }
+      },
+      {
+        path: 'constancia-reporte',
+        loadChildren: () => import('./constancia-reporte/constancia-reporte.module').then(m => m.ConstanciaReportePageModule)
+      },
 
     ]
   },
+
 
 
 

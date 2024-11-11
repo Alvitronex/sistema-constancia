@@ -3,7 +3,7 @@ import { AngularFireAuth } from '@angular/fire/compat/auth';
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, sendPasswordResetEmail, updateEmail as firebaseUpdateEmail, reauthenticateWithCredential, EmailAuthProvider, AuthErrorCodes, updateEmail } from 'firebase/auth';
 import { User } from '../models/user.models';
 import { AngularFirestore } from '@angular/fire/compat/firestore';
-import { getFirestore, setDoc, doc, getDoc, addDoc, collection, collectionData, query, updateDoc, deleteDoc, where, orderBy } from '@angular/fire/firestore';
+import { getFirestore, setDoc, doc, getDoc, addDoc, collection, collectionData, query, updateDoc, deleteDoc, where, orderBy, getDocs } from '@angular/fire/firestore';
 import { UtilsService } from './utils.service';
 import { AngularFireStorage } from '@angular/fire/compat/storage';
 import { getStorage, uploadBytes, ref, getDownloadURL, uploadString, deleteObject } from 'firebase/storage';
@@ -22,7 +22,21 @@ export class FirebaseService {
   firestore = inject(AngularFirestore);
   storage = inject(AngularFireStorage);
   utilsSvc = inject(UtilsService);
-
+  // Añadir al inicio de la clase FirebaseService
+  months = [
+    { value: '1', label: 'Enero' },
+    { value: '2', label: 'Febrero' },
+    { value: '3', label: 'Marzo' },
+    { value: '4', label: 'Abril' },
+    { value: '5', label: 'Mayo' },
+    { value: '6', label: 'Junio' },
+    { value: '7', label: 'Julio' },
+    { value: '8', label: 'Agosto' },
+    { value: '9', label: 'Septiembre' },
+    { value: '10', label: 'Octubre' },
+    { value: '11', label: 'Noviembre' },
+    { value: '12', label: 'Diciembre' }
+  ];
   // ========================== Autenticación ==========================
   getAuth() {
     return getAuth();
@@ -315,4 +329,184 @@ export class FirebaseService {
       throw error;
     }
   }
+  
+  async getAllConstancias(): Promise<Constancia[]> {
+    try {
+      const constancias: Constancia[] = [];
+      const usersRef = collection(getFirestore(), 'users');
+      const usersSnap = await getDocs(usersRef);
+
+      for (const userDoc of usersSnap.docs) {
+        const constanciasRef = collection(getFirestore(), `users/${userDoc.id}/constancia`);
+        const constanciasSnap = await getDocs(constanciasRef);
+
+        constanciasSnap.docs.forEach(doc => {
+          const data: any = doc.data();
+
+          // Manejar createdAt con operador de acceso seguro
+          const createdAt = data?.createdAt ?
+            (typeof data.createdAt === 'string' ?
+              data.createdAt :
+              data.createdAt?.toDate?.()?.toISOString?.() || new Date().toISOString()
+            ) : new Date().toISOString();
+
+          // Manejar updatedAt con operador de acceso seguro
+          const updatedAt = data?.updatedAt ?
+            (typeof data.updatedAt === 'string' ?
+              data.updatedAt :
+              data.updatedAt?.toDate?.()?.toISOString?.() || createdAt
+            ) : createdAt;
+
+          // Crear objeto constancia con acceso seguro a propiedades
+          const constancia: Constancia = {
+            id: doc.id,
+            nombre: data?.nombre || '',
+            apellidos: data?.apellidos || '',
+            documento: data?.documento || '',
+            tipo: data?.tipo || '',
+            motivo: data?.motivo || '',
+            estado: data?.estado || 'pendiente',
+            createdAt,
+            updatedAt,
+            userId: userDoc.id,
+            userEmail: data?.userEmail || ''
+          };
+
+          constancias.push(constancia);
+        });
+      }
+
+      // Ordenar por fecha de creación descendente
+      return constancias.sort((a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+
+    } catch (error) {
+      console.error('Error getting all constancias:', error);
+      return [];
+    }
+  }
+  private formatFirestoreDate(date: any): string {
+    if (!date) return new Date().toISOString();
+    if (typeof date === 'string') return date;
+    if (date.toDate) return date.toDate().toISOString();
+    return new Date().toISOString();
+  }
+  async getConstanciasStats(year: number, month: string = 'all') {
+    try {
+      const constancias = await this.getAllConstancias();
+      if (!constancias || constancias.length === 0) {
+        return {
+          aprobadas: 0,
+          rechazadas: 0,
+          pendientes: 0,
+          porMes: []
+        };
+      }
+
+      // Inicializar estadísticas
+      const stats = {
+        aprobadas: 0,
+        rechazadas: 0,
+        pendientes: 0,
+        porMes: []
+      };
+
+      // Filtrar constancias por año
+      const filteredConstancias = constancias.filter(c => {
+        const fecha = new Date(c.createdAt);
+        if (month === 'all') {
+          return fecha.getFullYear() === year;
+        }
+        return fecha.getFullYear() === year && (fecha.getMonth() + 1) === parseInt(month);
+      });
+
+      // Si no hay constancias para el período seleccionado, retornar stats con ceros
+      if (filteredConstancias.length === 0) {
+        return stats;
+      }
+
+      // Calcular totales
+      filteredConstancias.forEach(c => {
+        switch (c.estado) {
+          case 'aprobada':
+            stats.aprobadas++;
+            break;
+          case 'rechazada':
+            stats.rechazadas++;
+            break;
+          case 'pendiente':
+            stats.pendientes++;
+            break;
+        }
+      });
+
+      // Procesar datos mensuales solo si se solicitan todos los meses
+      if (month === 'all') {
+        const constanciasPorMes = new Map();
+
+        // Inicializar los meses que tienen datos
+        filteredConstancias.forEach(c => {
+          const fecha = new Date(c.createdAt);
+          const mes = fecha.getMonth();
+          if (!constanciasPorMes.has(mes)) {
+            constanciasPorMes.set(mes, {
+              aprobadas: 0,
+              rechazadas: 0,
+              pendientes: 0
+            });
+          }
+
+          const mesStats = constanciasPorMes.get(mes);
+          switch (c.estado) {
+            case 'aprobada':
+              mesStats.aprobadas++;
+              break;
+            case 'rechazada':
+              mesStats.rechazadas++;
+              break;
+            case 'pendiente':
+              mesStats.pendientes++;
+              break;
+          }
+        });
+
+        // Convertir el Map a array solo para los meses con datos
+        // En el método getConstanciasStats
+        stats.porMes = Array.from(constanciasPorMes.entries())
+          .map(([mes, stats]) => ({
+            mes: this.getNombreMes(parseInt(mes)),
+            ...stats
+          }))
+          .sort((a, b) => {
+            const meses = [
+              'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+              'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+            ];
+            return meses.indexOf(a.mes) - meses.indexOf(b.mes);
+          });
+      }
+
+      return stats;
+
+    } catch (error) {
+      console.error('Error getting constancias stats:', error);
+      // Retornar estadísticas vacías en caso de error
+      return {
+        aprobadas: 0,
+        rechazadas: 0,
+        pendientes: 0,
+        porMes: []
+      };
+    }
+  }
+
+  private getNombreMes(mes: number): string {
+    const meses = [
+      'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+    ];
+    return meses[mes];
+  }
+
 }

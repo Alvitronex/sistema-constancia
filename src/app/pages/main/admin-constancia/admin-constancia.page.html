@@ -52,9 +52,15 @@
         </ion-button>
       </ion-col>
       <ion-col size="auto">
-        <ion-button (click)="generateMonthlyReport()" color="secondary">
+        <!-- <ion-button (click)="generateMonthlyReport()" color="secondary">
           <ion-icon name="document-text-outline" slot="start"></ion-icon>
           Generar Informe Mensual
+        </ion-button> -->
+        &nbsp;
+
+        <ion-button (click)="verInforme()" color="secondary">
+          <ion-icon name="stats-chart-outline" slot="start"></ion-icon>
+          Ver Informe Detallado
         </ion-button>
         &nbsp;
         <ion-button class="nueva-constancia" (click)="createConstancia()">
