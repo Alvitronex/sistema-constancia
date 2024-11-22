@@ -65,7 +65,7 @@ export class ConstanciaReportePage implements OnInit, OnDestroy {
   private async updateAvailableMonths() {
     try {
       const constancias = await this.firebaseSvc.getAllConstancias();
-      
+
       // Filtrar constancias del año seleccionado
       const constanciasDelAño = constancias.filter(c => {
         const fecha = new Date(c.createdAt);
@@ -282,6 +282,19 @@ export class ConstanciaReportePage implements OnInit, OnDestroy {
       });
     }
   }
+
+  // Método auxiliar para obtener el mes con más constancias
+  private getMesConMasConstancias(): string {
+    if (!this.stats?.porMes?.length) return 'No hay datos';
+
+    const mesMax = this.stats.porMes.reduce((max, mes) => {
+      const totalMes = mes.aprobadas + mes.rechazadas + mes.pendientes;
+      const totalMax = max.aprobadas + max.rechazadas + max.pendientes;
+      return totalMes > totalMax ? mes : max;
+    });
+
+    return `${mesMax.mes} (${mesMax.aprobadas + mesMax.rechazadas + mesMax.pendientes} constancias)`;
+  }
   // Añadir métodos específicos para cambios
   private async initializeYears() {
     try {
@@ -314,7 +327,7 @@ export class ConstanciaReportePage implements OnInit, OnDestroy {
     }
   }
 
- 
+
 
   async loadStats() {
     let loading;
@@ -445,12 +458,19 @@ export class ConstanciaReportePage implements OnInit, OnDestroy {
     });
   }
 
+
+
+  // Método principal para generar PDF
   async generarPDF() {
     if (!this.stats) return;
-
     try {
       const loading = await this.utilsSvc.loading();
       await loading.present();
+
+      // Obtener mes seleccionado para el título
+      const mesSeleccionado = this.selectedMonth === 'all' ?
+        'todos los meses' :
+        this.months.find(m => m.value === this.selectedMonth)?.label;
 
       const docDefinition: any = {
         content: [
@@ -459,25 +479,12 @@ export class ConstanciaReportePage implements OnInit, OnDestroy {
             style: 'header'
           },
           {
-            text: `${this.selectedMonth === 'all' ? 'Año' : 'Mes'} ${this.selectedYear}`,
+            text: `Período: ${mesSeleccionado} ${this.selectedYear}`,
             style: 'subheader'
           },
           {
             text: `Fecha de generación: ${new Date().toLocaleDateString()}`,
             margin: [0, 0, 0, 20]
-          },
-          {
-            table: {
-              headerRows: 1,
-              widths: ['*', '*', '*'],
-              body: [
-                ['Estado', 'Cantidad', 'Porcentaje'],
-                ['Aprobadas', this.stats.aprobadas, `${((this.stats.aprobadas / this.getTotalConstancias()) * 100).toFixed(1)}%`],
-                ['Rechazadas', this.stats.rechazadas, `${((this.stats.rechazadas / this.getTotalConstancias()) * 100).toFixed(1)}%`],
-                ['Pendientes', this.stats.pendientes, `${((this.stats.pendientes / this.getTotalConstancias()) * 100).toFixed(1)}%`],
-                ['Total', this.getTotalConstancias(), '100%']
-              ]
-            }
           }
         ],
         styles: {
@@ -491,14 +498,120 @@ export class ConstanciaReportePage implements OnInit, OnDestroy {
             fontSize: 16,
             bold: true,
             margin: [0, 10, 0, 5]
+          },
+          tableHeader: {
+            bold: true,
+            fontSize: 13,
+            color: 'black',
+            fillColor: '#eeeeee',
           }
+        },
+        defaultStyle: {
+          fontSize: 12
         }
       };
 
+      if (this.selectedMonth === 'all') {
+        docDefinition.content.push({
+          table: {
+            headerRows: 1,
+            widths: ['*', 'auto', '*'],
+            body: [
+              [
+                { text: 'Estado', style: 'tableHeader' },
+                { text: 'Cantidad', style: 'tableHeader' },
+                { text: 'Usuario', style: 'tableHeader' }
+              ],
+              [
+                'Aprobadas',
+                this.stats.aprobadas,
+                this.getUsuariosEstadoAnual('aprobada')
+              ],
+              [
+                'Rechazadas',
+                this.stats.rechazadas,
+                this.getUsuariosEstadoAnual('rechazada')
+              ],
+              [
+                'Pendientes',
+                this.stats.pendientes,
+                this.getUsuariosEstadoAnual('pendiente')
+              ],
+              [
+                { text: 'Total', bold: true },
+                { text: this.getTotalConstancias(), bold: true },
+                { text: 'Total Usuarios', bold: true }
+              ]
+            ]
+          }
+        });
+      } else {
+        docDefinition.content.push({
+          table: {
+            headerRows: 1,
+            widths: ['*', 'auto', '*'],
+            body: [
+              [
+                { text: 'Estado', style: 'tableHeader' },
+                { text: 'Cantidad', style: 'tableHeader' },
+                { text: 'Usuario', style: 'tableHeader' }
+              ],
+              [
+                'Aprobadas',
+                this.stats.aprobadas,
+                this.stats.aprobadas > 0 ? this.getUsuariosEstado('aprobada') : 'N/A'
+              ],
+              [
+                'Rechazadas',
+                this.stats.rechazadas,
+                this.stats.rechazadas > 0 ? this.getUsuariosEstado('rechazada') : 'N/A'
+              ],
+              [
+                'Pendientes',
+                this.stats.pendientes,
+                this.stats.pendientes > 0 ? this.getUsuariosEstado('pendiente') : 'N/A'
+              ],
+              [
+                { text: 'Total', bold: true },
+                { text: this.getTotalConstancias(), bold: true },
+                { text: 'Total Usuarios', bold: true }
+              ]
+            ]
+          }
+        });
+
+        docDefinition.content.push(
+          {
+            text: '\nDetalles del Mes',
+            style: 'subheader',
+            margin: [0, 20, 0, 10]
+          },
+          {
+            ul: [
+              `Total de Constancias Procesadas: ${this.getTotalConstancias()}`,
+              `Total de Constancias Aprobadas: ${this.stats.aprobadas}`,
+              `Total de Constancias Rechazadas: ${this.stats.rechazadas}`,
+              `Total de Constancias Pendientes: ${this.stats.pendientes}`
+            ]
+          }
+        );
+      }
+
       this.utilsSvc.pdfMake();
-      pdfMake.createPdf(docDefinition).download('reporte-constancias.pdf');
+      const fileName = this.selectedMonth === 'all'
+        ? `reporte-constancias-${this.selectedYear}`
+        : `reporte-constancias-${mesSeleccionado}-${this.selectedYear}`;
+
+      pdfMake.createPdf(docDefinition).download(`${fileName}.pdf`);
 
       await loading.dismiss();
+
+      this.utilsSvc.presentToast({
+        message: 'PDF generado correctamente',
+        duration: 2500,
+        color: 'success',
+        position: 'middle'
+      });
 
     } catch (error) {
       console.error('Error al generar PDF:', error);
@@ -514,11 +627,50 @@ export class ConstanciaReportePage implements OnInit, OnDestroy {
     }
   }
 
+
+
+  // Método para obtener constancias filtradas por estado y fecha
+  private getConstanciasPorEstado(estado: string): any[] {
+    const fecha = new Date(this.selectedYear, parseInt(this.selectedMonth) - 1);
+    return this.allConstancias.filter(c => {
+      const constanciaFecha = new Date(c.createdAt);
+      return c.estado === estado &&
+        constanciaFecha.getMonth() === fecha.getMonth() &&
+        constanciaFecha.getFullYear() === fecha.getFullYear();
+    });
+  }
+
+  // Método para calcular el total de constancias
   getTotalConstancias(): number {
     if (!this.stats) return 0;
     const total = (this.stats.aprobadas || 0) +
       (this.stats.rechazadas || 0) +
       (this.stats.pendientes || 0);
     return total;
+  }
+  // Modificar el método getUsuariosEstado para mostrar nombre y apellido
+  private getUsuariosEstado(estado: string): string {
+    const constancias = this.getConstanciasPorEstado(estado);
+    // Crear un Set de usuarios únicos con formato "nombre apellidos"
+    const usuarios = [...new Set(constancias.map(c => `${c.nombre} ${c.apellidos}`))];
+    return usuarios.join(', ') || 'N/A';
+  }
+
+  // Modificar el método getUsuariosEstadoAnual también
+  private getUsuariosEstadoAnual(estado: string): string {
+    const constanciasAño = this.allConstancias.filter(c => {
+      const fecha = new Date(c.createdAt);
+      return fecha.getFullYear() === this.selectedYear && c.estado === estado;
+    });
+
+    // Crear un Set de usuarios únicos con formato "nombre apellidos"
+    const usuariosUnicos = [...new Set(constanciasAño.map(c => `${c.nombre} ${c.apellidos}`))];
+
+    // Si la lista es muy larga, mostrar solo los primeros 3
+    if (usuariosUnicos.length > 3) {
+      return usuariosUnicos.slice(0, 3).join(', ') + '...';
+    }
+
+    return usuariosUnicos.length > 0 ? usuariosUnicos.join(', ') : 'N/A';
   }
 }
