@@ -16,6 +16,7 @@ Chart.register(...registerables);
 export class ConstanciaReportePage implements OnInit, OnDestroy {
   @ViewChild('barChart') barChart: ElementRef;
   chart: any;
+  availableMonths: { value: string, label: string }[] = [];
 
   selectedYear: number;
   selectedMonth: string = 'all';
@@ -45,6 +46,7 @@ export class ConstanciaReportePage implements OnInit, OnDestroy {
 
   async ngOnInit() {
     await this.initializeYears();
+    await this.updateAvailableMonths(); // Nuevo método
     this.loadStats();
   }
 
@@ -54,6 +56,65 @@ export class ConstanciaReportePage implements OnInit, OnDestroy {
     if (this.chart) {
       this.chart.destroy();
     }
+  }
+  private readonly monthNames = [
+    'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+  ];
+  // Nuevo método para actualizar meses disponibles
+  private async updateAvailableMonths() {
+    try {
+      const constancias = await this.firebaseSvc.getAllConstancias();
+      
+      // Filtrar constancias del año seleccionado
+      const constanciasDelAño = constancias.filter(c => {
+        const fecha = new Date(c.createdAt);
+        return fecha.getFullYear() === this.selectedYear;
+      });
+
+      if (constanciasDelAño.length === 0) {
+        this.availableMonths = [{ value: 'all', label: 'Todos los meses' }];
+        this.selectedMonth = 'all';
+        return;
+      }
+
+      // Obtener meses únicos
+      const mesesUnicos = [...new Set(
+        constanciasDelAño.map(c => {
+          const fecha = new Date(c.createdAt);
+          return fecha.getMonth();
+        })
+      )].sort((a, b) => a - b);
+
+      // Crear array de meses disponibles
+      this.availableMonths = [
+        { value: 'all', label: 'Todos los meses' },
+        ...mesesUnicos.map(mes => ({
+          value: (mes + 1).toString(),
+          label: this.monthNames[mes]
+        }))
+      ];
+
+    } catch (error) {
+      console.error('Error al cargar meses disponibles:', error);
+      this.availableMonths = [{ value: 'all', label: 'Todos los meses' }];
+      this.selectedMonth = 'all';
+    }
+  }
+
+  // Modificar onYearChange para actualizar meses
+  async onYearChange(event: any) {
+    console.log('Año seleccionado:', event.detail.value);
+    this.selectedYear = event.detail.value;
+    await this.updateAvailableMonths(); // Actualizar meses disponibles
+    this.selectedMonth = 'all'; // Reset mes seleccionado
+    this.loadStats();
+  }
+
+  onMonthChange(event: any) {
+    console.log('Mes seleccionado:', event.detail.value);
+    this.selectedMonth = event.detail.value;
+    this.loadStats();
   }
 
   private groupConstanciasByMonth(constancias: Constancia[]) {
@@ -253,18 +314,7 @@ export class ConstanciaReportePage implements OnInit, OnDestroy {
     }
   }
 
-  // Actualizar para incluir un log de diagnóstico
-  onYearChange(event: any) {
-    console.log('Año seleccionado:', event.detail.value);
-    this.selectedYear = event.detail.value;
-    this.loadStats();
-  }
-
-  onMonthChange(event: any) {
-    console.log('Mes seleccionado:', event.detail.value);
-    this.selectedMonth = event.detail.value;
-    this.loadStats();
-  }
+ 
 
   async loadStats() {
     let loading;

@@ -1,6 +1,13 @@
+/* constancia-reporte.page.scss */
 .stats-cards {
   margin-top: 20px;
   margin-bottom: 20px;
+
+  ion-card {
+    margin: 10px;
+    border-radius: 10px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  }
 }
 
 .stat-header {
@@ -24,18 +31,20 @@
   font-size: 32px;
   font-weight: bold;
   text-align: center;
-  color: var(--ion-color-dark);
+
+  &.success {
+    color: var(--ion-color-success);
+  }
+
+  &.danger {
+    color: var(--ion-color-danger);
+  }
+
+  &.warning {
+    color: var(--ion-color-warning);
+  }
 }
 
-ion-card {
-  margin: 10px;
-  border-radius: 10px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-}
-
-ion-button {
-  margin: 20px 0;
-}
 .chart-container {
   background: white;
   border-radius: 10px;
@@ -62,4 +71,75 @@ ion-button {
   width: 100%;
   height: 300px;
   margin: 20px 0;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+
+  .empty-icon {
+    font-size: 64px;
+    color: var(--ion-color-medium);
+    margin-bottom: 20px;
+  }
+
+  h3 {
+    font-size: 20px;
+    color: var(--ion-color-dark);
+    margin-bottom: 10px;
+  }
+
+  p {
+    color: var(--ion-color-medium);
+  }
+}
+
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 0;
+
+  p {
+    margin-top: 10px;
+    color: var(--ion-color-medium);
+  }
+}
+
+// Estilos responsivos
+@media (max-width: 768px) {
+  .filters-container {
+    ion-col {
+      margin-bottom: 10px;
+    }
+  }
+
+  .stats-cards {
+    ion-card {
+      margin: 5px;
+    }
+  }
+
+  .chart-container {
+    padding: 15px;
+  }
+
+  .chart-wrapper {
+    height: 250px;
+  }
+}
+
+.filters-container {
+  background: white;
+  border-radius: 10px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+
+  ion-item {
+    --background: transparent;
+    --border-color: var(--ion-color-medium);
+    --border-radius: 8px;
+    --padding-start: 0;
+  }
 }

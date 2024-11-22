@@ -329,7 +329,7 @@ export class FirebaseService {
       throw error;
     }
   }
-  
+
   async getAllConstancias(): Promise<Constancia[]> {
     try {
       const constancias: Constancia[] = [];
@@ -404,6 +404,19 @@ export class FirebaseService {
         };
       }
 
+      // Filtrar constancias por año y mes
+      const filteredConstancias = constancias.filter(c => {
+        const fecha = new Date(c.createdAt);
+        const constanciaYear = fecha.getFullYear();
+        const constanciaMonth = (fecha.getMonth() + 1).toString();
+
+        if (month === 'all') {
+          return constanciaYear === year;
+        } else {
+          return constanciaYear === year && constanciaMonth === month;
+        }
+      });
+
       // Inicializar estadísticas
       const stats = {
         aprobadas: 0,
@@ -411,15 +424,6 @@ export class FirebaseService {
         pendientes: 0,
         porMes: []
       };
-
-      // Filtrar constancias por año
-      const filteredConstancias = constancias.filter(c => {
-        const fecha = new Date(c.createdAt);
-        if (month === 'all') {
-          return fecha.getFullYear() === year;
-        }
-        return fecha.getFullYear() === year && (fecha.getMonth() + 1) === parseInt(month);
-      });
 
       // Si no hay constancias para el período seleccionado, retornar stats con ceros
       if (filteredConstancias.length === 0) {
@@ -441,11 +445,11 @@ export class FirebaseService {
         }
       });
 
-      // Procesar datos mensuales solo si se solicitan todos los meses
+      // Procesar datos para el gráfico
       if (month === 'all') {
+        // Si es todos los meses, mostrar datos por cada mes
         const constanciasPorMes = new Map();
 
-        // Inicializar los meses que tienen datos
         filteredConstancias.forEach(c => {
           const fecha = new Date(c.createdAt);
           const mes = fecha.getMonth();
@@ -471,27 +475,28 @@ export class FirebaseService {
           }
         });
 
-        // Convertir el Map a array solo para los meses con datos
-        // En el método getConstanciasStats
+        // Convertir el Map a array ordenado por mes
         stats.porMes = Array.from(constanciasPorMes.entries())
-          .map(([mes, stats]) => ({
-            mes: this.getNombreMes(parseInt(mes)),
-            ...stats
+          .map(([mes, estadisticas]) => ({
+            mes: this.months[parseInt(mes)].label,
+            ...estadisticas
           }))
-          .sort((a, b) => {
-            const meses = [
-              'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-              'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
-            ];
-            return meses.indexOf(a.mes) - meses.indexOf(b.mes);
-          });
+          .sort((a, b) => this.months.findIndex(m => m.label === a.mes) -
+            this.months.findIndex(m => m.label === b.mes));
+      } else {
+        // Si es un mes específico, mostrar solo ese mes
+        stats.porMes = [{
+          mes: this.months[parseInt(month) - 1].label,
+          aprobadas: stats.aprobadas,
+          rechazadas: stats.rechazadas,
+          pendientes: stats.pendientes
+        }];
       }
 
       return stats;
 
     } catch (error) {
       console.error('Error getting constancias stats:', error);
-      // Retornar estadísticas vacías en caso de error
       return {
         aprobadas: 0,
         rechazadas: 0,
@@ -501,12 +506,9 @@ export class FirebaseService {
     }
   }
 
+  // Método auxiliar para obtener nombre del mes
   private getNombreMes(mes: number): string {
-    const meses = [
-      'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
-    ];
-    return meses[mes];
+    return this.months[mes].label;
   }
 
 }
